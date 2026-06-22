@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gardermoen Live</title>
+    <style>
+        /* E-ink optimalisert stil: Kun sort/hvitt og høy kontrast */
+        body {
+            font-family: monospace, sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            padding: 10px;
+            margin: 0;
+        }
+        h1 {
+            font-size: 1.3rem;
+            margin-bottom: 5px;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 5px;
+        }
+        .meta {
+            font-size: 0.8rem;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        button {
+            background-color: #ffffff;
+            color: #000000;
+            border: 2px solid #000000;
+            padding: 8px 15px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border-bottom: 1px solid #000000;
+            text-align: left;
+            padding: 6px 4px;
+            font-size: 0.9rem;
+        }
+        th {
+            font-weight: bold;
+        }
+        .loading {
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>GARDERMOEN (10KM - KUN I LUFTA)</h1>
+    <div class="meta">
+        Sist oppdatert: <span id="time">-</span><br>
+        Neste automatiske oppdatering om: <span id="teller">45</span>s
+    </div>
+
+    <button onclick="nullstillOgHent()">OPPDATER NÅ</button>
+
+    <div id="status" class="loading">Henter ferske flydata...</div>
+    
+    <table id="flyTabell" style="display: none;">
+        <thead>
+            <tr>
+                <th>Fly / Rute</th>
+                <th>Høyde (fot)</th>
+                <th>Fart (knop)</th>
+                <th>Avstand</th>
+            </tr>
+        </thead>
+        <tbody id="flyData">
+        </tbody>
+    </table>
+
+    <script>
+        // Sentrumskoordinater for Gardermoen
+        const mittPunktLat = 60.197;
+        const mittPunktLon = 11.096;
+
+        // Ny og mer stabil datakilde (Tar i mot ADS-B rådata uten IP-sperrer for lavfrekvent bruk)
+        const url = "https://api.allorigins.win/get?url=" + encodeURIComponent("https://opendata.adsbexchange.com/virtualradar/AircraftList.json?lat=60.197&lng=11.096&fMilQ=No&fInB=10");
+        
+        // Økt til 45 sekunder for å være ekstra snill med både batteriet på Nook-en og serveren
+        const oppdateringsFrekvensSekunder = 45;
+        let sekunderIgjen = oppdateringsFrekvensSekunder;
+
+        function kalkulerAvstand(lat1, lon1, lat2, lon2) {
+            const x = (lon2 - lon1) * Math.cos((lat1 + lat2) / 2 * Math.PI / 180) * 111.32;
+            const y = (lat2 - lat1) * 111.13;
+            return Math.sqrt(x * x + y * y);
+        }
+
+        async function hentFlydata() {
+            const statusEl = document.getElementById("status");
+            const tabellEl = document.getElementById("flyTabell");
+            const dataBoks = document.getElementById("flyData");
+            const tidsEl = document.getElementById("time");
+
+            statusEl.style.display = "block";
+            statusEl.innerText = "Henter ferske data...";
+            tabellEl.style.display = "none";
+            dataBoks.innerHTML = "";
+
+            try {
+                const response = await fetch(url);
+                const proxyData = await response.json();
+                const data = JSON.parse(proxyData.contents);
+                
+                const nå = new Date();
+                tidsEl.innerText = nå.toLocaleTimeString("no-NO");
+
+                if (!data.ac || data.ac.length === 0) {
+                    statusEl.innerText = "Ingen fly i lufta innenfor 10 km akkurat nå.";
+                    tabellEl.style.display = "none";
+                    return;
+                }
+
+                let flyListe = [];
+
+                data.ac.forEach(fly => {
+                    const flyLat = fly.Lat;
+                    const flyLon = fly.Long;
+                    const høyde = fly.Alt; // i fot
+                    const påBakken = fly.Gnd; // true/false
+
+                    if (påBakken || !flyLat || !flyLon || !høyde || høyde <= 100) {
+                        return; 
+                    }
+                    
+                    const avstandKm = kalkulerAvstand(mittPunktLat, mittPunktLon, flyLat, flyLon);
+                    const ruteNavn = fly.Icao || fly.Call || "Ukjent";
+
+                    flyListe.push({
+                        rute: ruteNavn.trim(),
+                        høyde: høyde + " ft",
+                        fart: (fly.Spd || 0) + " kt",
+                        avstand: avstandKm
+                    });
+                });
+
+                if (flyListe.length === 0) {
+                    statusEl.innerText = "Ingen fly i lufta innenfor 10 km akkurat nå.";
+                    tabellEl.style.display = "none";
+                    return;
+                }
+
+                flyListe.sort((a, b) => b.avstand - a.avstand);
+
+                statusEl.style.display = "none";
+                tabellEl.style.display = "table";
+
+                flyListe.forEach(fly => {
+                    const rad = document.createElement("tr");
+                    rad.innerHTML = `
+                        <td><strong>${fly.rute}</strong></td>
+                        <td>${fly.høyde}</td>
+                        <td>${fly.fart}</td>
+                        <td><strong>${fly.avstand.toFixed(1)} km</strong></td>
+                    `;
+                    dataBoks.appendChild(rad);
+                });
+
+            } catch (error) {
+                statusEl.innerText = "Venter på server-respons...";
+                console.error(error);
+            }
+        }
+
+        function nullstillOgHent() {
+            sekunderIgjen = oppdateringsFrekvensSekunder;
+            document.getElementById("teller").innerText = sekunderIgjen;
+            hentFlydata();
+        }
+
+        setInterval(() => {
+            sekunderIgjen--;
+            if (sekunderIgjen <= 0) {
+                sekunderIgjen = oppdateringsFrekvensSekunder;
+                hentFlydata();
+            }
+            document.getElementById("teller").innerText = sekunderIgjen;
+        }, 1000);
+
+        hentFlydata();
+    </script>
+
+</body>
+</html>
