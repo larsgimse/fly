@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fly over Tromsø</title>
+    <style>
+        /* E-ink optimalisert stil: Kun sort/hvitt og høy kontrast */
+        body {
+            font-family: monospace, sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            padding: 10px;
+            margin: 0;
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 5px;
+        }
+        .meta {
+            font-size: 0.8rem;
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #ffffff;
+            color: #000000;
+            border: 2px solid #000000;
+            padding: 8px 15px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        button:active {
+            background-color: #000000;
+            color: #ffffff;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border-bottom: 1px solid #000000;
+            text-align: left;
+            padding: 6px 4px;
+            font-size: 0.9rem;
+        }
+        th {
+            font-weight: bold;
+        }
+        .loading {
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>FLY OVER TROMSØ</h1>
+    <div class="meta">
+        Sist oppdatert: <span id="time">-</span>
+    </div>
+
+    <button onclick="hentFlydata()">OPPDATER NÅ</button>
+
+    <div id="status" class="loading">Henter data...</div>
+    
+    <table id="flyTabell" style="display: none;">
+        <thead>
+            <tr>
+                <th>Fly / Rute</th>
+                <th>Høyde (m)</th>
+                <th>Fart (km/t)</th>
+                <th>Retning</th>
+            </tr>
+        </thead>
+        <tbody id="flyData">
+            </tbody>
+    </table>
+
+    <script>
+        // Tromsø koordinat-boks
+        const url = "https://opensky-network.org/api/states/all?lamin=69.5&lamax=69.8&lomin=18.5&lomax=19.5";
+
+        async function hentFlydata() {
+            const statusEl = document.getElementById("status");
+            const tabellEl = document.getElementById("flyTabell");
+            const dataBoks = document.getElementById("flyData");
+            const tidsEl = document.getElementById("time");
+
+            statusEl.style.display = "block";
+            statusEl.innerText = "Henter ferske data...";
+            tabellEl.style.style = "none";
+            dataBoks.innerHTML = "";
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                // Oppdater tidsstempel på skjermen
+                const nå = new Date();
+                tidsEl.innerText = nå.toLocaleTimeString("no-NO");
+
+                if (!data.states || data.states.length === 0) {
+                    statusEl.innerText = "Ingen fly i luftrommet akkurat nå.";
+                    tabellEl.style.display = "none";
+                    return;
+                }
+
+                statusEl.style.display = "none";
+                tabellEl.style.display = "table";
+
+                // Gå gjennom alle fly funnet
+                data.states.forEach(fly => {
+                    const rute = fly[1] && fly[1].trim() !== "" ? fly[1].trim() : "Ukjent";
+                    const høyde = fly[7] ? Math.round(fly[7]) : "-";
+                    const fart = fly[9] ? Math.round(fly[9] * 3.6) : "-"; // m/s til km/t
+                    const retning = fly[10] ? Math.round(fly[10]) + "°" : "-";
+
+                    const rad = document.createElement("tr");
+                    rad.innerHTML = `
+                        <td><strong>${rute}</strong></td>
+                        <td>${høyde}m</td>
+                        <td>${fart}</td>
+                        <td>${retning}</td>
+                    `;
+                    dataBoks.appendChild(rad);
+                });
+
+            } catch (error) {
+                statusEl.innerText = "Feil ved henting av data. Prøv igjen.";
+                console.error(error);
+            }
+        }
+
+        // Hent data med en gang siden lastes inn
+        hentFlydata();
+
+        // Automatisk oppdatering hvert 2. minutt (snilt for E-ink og API-kvoter)
+        setInterval(hentFlydata, 120000);
+    </script>
+
+</body>
+</html>
