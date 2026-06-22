@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gardermoen (Kun fly i lufta)</title>
+    <style>
+        /* E-ink optimalisert stil: Kun sort/hvitt og høy kontrast */
+        body {
+            font-family: monospace, sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            padding: 10px;
+            margin: 0;
+        }
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 5px;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 5px;
+        }
+        .meta {
+            font-size: 0.8rem;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        button {
+            background-color: #ffffff;
+            color: #000000;
+            border: 2px solid #000000;
+            padding: 8px 15px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border-bottom: 1px solid #000000;
+            text-align: left;
+            padding: 6px 4px;
+            font-size: 0.9rem;
+        }
+        th {
+            font-weight: bold;
+        }
+        .loading {
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>GARDERMOEN (KUN I LUFTA - LENGST UNNA ØVERST)</h1>
+    <div class="meta">
+        Sist oppdatert: <span id="time">-</span><br>
+        Neste automatiske oppdatering om: <span id="teller">30</span>s
+    </div>
+
+    <button onclick="nullstillOgHent()">OPPDATER NÅ</button>
+
+    <div id="status" class="loading">Henter og sorterer luftbårne fly...</div>
+        
+    <table id="flyTabell" style="display: none;">
+        <thead>
+            <tr>
+                <th>Fly / Rute</th>
+                <th>Fra -> Til</th>
+                <th>Høyde/Fart</th>
+                <th>Avstand</th>
+            </tr>
+        </thead>
+        <tbody id="flyData">
+        </tbody>
+    </table>
+
+    <script>
+        // Sentrumskoordinater for Gardermoen terminal
+        const mittPunktLat = 60.197;
+        const mittPunktLon = 11.096;
+
+        // Base-URL uten tidsstempel
+        const baseUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.287,60.107,10.916,11.276%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=0%26air=1%26vehicles=0%26estimated=1";
+                
+        const oppdateringsFrekvensSekunder = 30;
+        let sekunderIgjen = oppdateringsFrekvensSekunder;
+
+        function kalkulerAvstand(lat1, lon1, lat2, lon2) {
+            const x = (lon2 - lon1) * Math.cos((lat1 + lat2) / 2 * Math.PI / 180) * 111.32;
+            const y = (lat2 - lat1) * 111.13;
+            return Math.sqrt(x * x + y * y);
+        }
+
+        async function hentFlydata() {
+            const statusEl = document.getElementById("status");
+            const tabellEl = document.getElementById("flyTabell");
+            const dataBoks = document.getElementById("flyData");
+            const tidsEl = document.getElementById("time");
+
+            statusEl.style.display = "block";
+            statusEl.innerText = "Henter ferske data...";
+            tabellEl.style.display = "none";
+            dataBoks.innerHTML = "";
+
+            try {
+                // Tvinger nettleseren til å ignorere cache ved å legge til unikt tall i URL-en (%26_ = &_ i kodet format)
+                const uniktTidsstempel = new Date().getTime();
+                const urlMedCacheBuster = baseUrl + "%26_=" + uniktTidsstempel;
+
+                const response = await fetch(urlMedCacheBuster);
+                const data = await response.json();
+                                
+                const nå = new Date();
+                tidsEl.innerText = nå.toLocaleTimeString("no-NO");
+
+                const flyNøkler = Object.keys(data).filter(key => key !== "full_count" && key !== "version" && key !== "stats");
+                
+                if (flyNøkler.length === 0) {
+                    statusEl.innerText = "Ingen fly i lufta innenfor 10 km akkurat nå.";
+                    tabellEl.style.display = "none";
+                    return;
+                }
+
+                let flyListe = [];
+                flyNøkler.forEach(nøkkel => {
+                    const flyinfo = data[nøkkel];
+                                        
+                    const flyLat = flyinfo[1];
+                    const flyLon = flyinfo[2];
+                    const altitude = flyinfo[4]; 
+
+                    const påBakken = flyinfo[14] === 1; 
+                    if (altitude <= 0 || påBakken) {
+                        return; 
+                    }
+                                        
+                    const avstandKm = kalkulerAvstand(mittPunktLat, mittPunktLon, flyLat, flyLon);
+
+                    flyListe.push({
+                        rute: flyinfo[13] && flyinfo[13] !== "" ? flyinfo[13] : (flyinfo[16] ? flyinfo[16] : "Ukjent"),
+                        fra: flyinfo[11] || "???",
+                        til: flyinfo[12] || "???",
+                        høyde: altitude + " ft",
+                        fart: flyinfo[5] + " kt",
+                        avstand: avstandKm
+                    });
+                });
+
+                if (flyListe.length === 0) {
+                    statusEl.innerText = "Ingen fly i lufta innenfor 10 km akkurat nå.";
+                    tabellEl.style.display = "none";
+                    return;
+                }
+
+                flyListe.sort((a, b) => b.avstand - a.avstand);
+                
+                statusEl.style.display = "none";
+                tabellEl.style.display = "table";
+                
+                flyListe.forEach(fly => {
+                    const rad = document.createElement("tr");
+                    rad.innerHTML = `
+                        <td><strong>${fly.rute}</strong></td>
+                        <td>${fly.fra} -> ${fly.til}</td>
+                        <td>${fly.høyde}<br>${fly.fart}</td>
+                        <td><strong>${fly.avstand.toFixed(1)} km</strong></td>
+                    `;
+                    dataBoks.appendChild(rad);
+                });
+
+            } catch (error) {
+                statusEl.innerText = "Kunne ikke hente data. Prøv igjen.";
+                console.error(error);
+            }
+        }
+
+        function nullstillOgHent() {
+            sekunderIgjen = oppdateringsFrekvensSekunder;
+            document.getElementById("teller").innerText = sekunderIgjen;
+            hentFlydata();
+        }
+
+        setInterval(() => {
+            sekunderIgjen--;
+            if (sekunderIgjen <= 0) {
+                sekunderIgjen = oppdateringsFrekvensSekunder;
+                hentFlydata();
+            }
+            document.getElementById("teller").innerText = sekunderIgjen;
+        }, 1000);
+
+        hentFlydata();
+    </script>
+</body>
+</html>
