@@ -79,9 +79,8 @@
     </table>
 
     <script>
-        // Geografisk boks oppdatert til Gardermoen-området (OSL)
-        // Format: Nord, Sør, Vest, Øst
-        const url = "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.30,60.10,10.90,11.30&faa=1&flight_states=1&satellite=1&mlat=1&flarm=1&adsb=1&gnd=1&air=1&vehicles=1&estimated=1";
+        // NÅ MED CORS-PROXY: Tvinger dataene gjennom en nøytral tjener så nettleseren godtar det
+        const url = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.30,60.10,10.90,11.30%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=1%26estimated=1";
         
         const oppdateringsFrekvensSekunder = 30;
         let sekunderIgjen = oppdateringsFrekvensSekunder;
@@ -119,7 +118,6 @@
                 flyNøkler.forEach(nøkkel => {
                     const flyinfo = data[nøkkel];
                     
-                    // Hent ut rutenummer, flyplasser, høyde og fart
                     const rute = flyinfo[13] && flyinfo[13] !== "" ? flyinfo[13] : (flyinfo[16] ? flyinfo[16] : "Ukjent");
                     const fra = flyinfo[11] || "???";
                     const til = flyinfo[12] || "???";
@@ -137,7 +135,7 @@
                 });
 
             } catch (error) {
-                statusEl.innerText = "Kunne ikke kontakte Flightradar24. Sjekk nettet.";
+                statusEl.innerText = "Kunne ikke hente data. Prøv igjen.";
                 console.error(error);
             }
         }
