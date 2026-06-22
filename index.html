@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gardermoen (Kun fly i lufta)</title>
+    <title>Gardermoen (Direkte API)</title>
     <style>
         /* E-ink optimalisert stil: Kun sort/hvitt og høy kontrast */
         body {
@@ -14,7 +14,7 @@
             margin: 0;
         }
         h1 {
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             margin-bottom: 5px;
             border-bottom: 2px solid #000000;
             padding-bottom: 5px;
@@ -55,7 +55,7 @@
 </head>
 <body>
 
-    <h1>GARDERMOEN (KUN I LUFTA - LENGST UNNA ØVERST)</h1>
+    <h1>GARDERMOEN (10KM - KUN I LUFTA)</h1>
     <div class="meta">
         Sist oppdatert: <span id="time">-</span><br>
         Neste automatiske oppdatering om: <span id="teller">30</span>s
@@ -63,14 +63,14 @@
 
     <button onclick="nullstillOgHent()">OPPDATER NÅ</button>
 
-    <div id="status" class="loading">Henter and sorterer luftbårne fly...</div>
+    <div id="status" class="loading">Henter ferske flydata...</div>
     
     <table id="flyTabell" style="display: none;">
         <thead>
             <tr>
                 <th>Fly / Rute</th>
-                <th>Fra -> Til</th>
-                <th>Høyde/Fart</th>
+                <th>Høyde (m)</th>
+                <th>Fart (km/t)</th>
                 <th>Avstand</th>
             </tr>
         </thead>
@@ -83,8 +83,8 @@
         const mittPunktLat = 60.197;
         const mittPunktLon = 11.096;
 
-        // API-URL pakket inn i en robust HTTP-kompatibel proxy
-        const url = "http://api.allorigins.win/get?url=" + encodeURIComponent("https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.287,60.107,10.916,11.276&faa=1&flight_states=1&satellite=1&mlat=1&flarm=1&adsb=1&gnd=0&air=1&vehicles=0&estimated=1");
+        // Stabil, direkte URL som ikke krever proxy overhodet
+        const url = "https://opensky-network.org/api/states/all?lamin=60.107&lamax=60.287&lomin=10.916&lomax=11.276";
         
         const oppdateringsFrekvensSekunder = 30;
         let sekunderIgjen = oppdateringsFrekvensSekunder;
@@ -104,22 +104,17 @@
 
             statusEl.style.display = "block";
             statusEl.innerText = "Henter ferske data...";
-            tabellEl.style.display = "none"; // RETTET: Endret fra .style.style til .style.display
+            tabellEl.style.display = "none";
             dataBoks.innerHTML = "";
 
             try {
                 const response = await fetch(url);
-                const proxyData = await response.json();
-                
-                // Pakker ut innholdet fra allorigins-proxyen
-                const data = JSON.parse(proxyData.contents);
+                const data = await response.json();
                 
                 const nå = new Date();
                 tidsEl.innerText = nå.toLocaleTimeString("no-NO");
 
-                const flyNøkler = Object.keys(data).filter(key => key !== "full_count" && key !== "version" && key !== "stats");
-
-                if (flyNøkler.length === 0) {
+                if (!data.states || data.states.length === 0) {
                     statusEl.innerText = "Ingen fly i lufta innenfor 10 km akkurat nå.";
                     tabellEl.style.display = "none";
                     return;
@@ -127,26 +122,25 @@
 
                 let flyListe = [];
 
-                flyNøkler.forEach(nøkkel => {
-                    const flyinfo = data[nøkkel];
-                    
-                    const flyLat = flyinfo[1];
-                    const flyLon = flyinfo[2];
-                    const altitude = flyinfo[4];
+                data.states.forEach(fly => {
+                    const flyLat = fly[6];
+                    const flyLon = fly[5];
+                    const høydeMeter = fly[7];
+                    const påBakken = fly[8]; // true eller false
 
-                    const påBakken = flyinfo[14] === 1;
-                    if (altitude <= 0 || påBakken) {
+                    // FILTER: Dropp flyet hvis det er markert på bakken, eller mangler koordinater/høyde
+                    if (påBakken || flyLat === null || flyLon === null || høydeMeter === null || høydeMeter <= 0) {
                         return; 
                     }
                     
                     const avstandKm = kalkulerAvstand(mittPunktLat, mittPunktLon, flyLat, flyLon);
+                    const kallesignal = fly[1] && fly[1].trim() !== "" ? fly[1].trim() : "Ukjent";
+                    const fartKmt = fly[9] ? Math.round(fly[9] * 3.6) : 0; // m/s til km/t
 
                     flyListe.push({
-                        rute: flyinfo[13] && flyinfo[13] !== "" ? flyinfo[13] : (flyinfo[16] ? flyinfo[16] : "Ukjent"),
-                        fra: flyinfo[11] || "???",
-                        til: flyinfo[12] || "???",
-                        høyde: altitude + " ft",
-                        fart: flyinfo[5] + " kt",
+                        rute: kallesignal,
+                        høyde: Math.round(høydeMeter) + " m",
+                        fart: fartKmt + " km/t",
                         avstand: avstandKm
                     });
                 });
@@ -157,6 +151,7 @@
                     return;
                 }
 
+                // Sorter listen: Størst avstand (lengst unna) havner øverst
                 flyListe.sort((a, b) => b.avstand - a.avstand);
 
                 statusEl.style.display = "none";
@@ -166,15 +161,15 @@
                     const rad = document.createElement("tr");
                     rad.innerHTML = `
                         <td><strong>${fly.rute}</strong></td>
-                        <td>${fly.fra} -> ${fly.til}</td>
-                        <td>${fly.høyde}<br>${fly.fart}</td>
+                        <td>${fly.høyde}</td>
+                        <td>${fly.fart}</td>
                         <td><strong>${fly.avstand.toFixed(1)} km</strong></td>
                     `;
                     dataBoks.appendChild(rad);
                 });
 
             } catch (error) {
-                statusEl.innerText = "Kunne ikke hente data. Prøv igjen.";
+                statusEl.innerText = "Nettverksfeil. Prøv igjen.";
                 console.error(error);
             }
         }
@@ -185,6 +180,7 @@
             hentFlydata();
         }
 
+        // Denne timeren vil fortsette å gå uansett om et API-kall skulle feile av og til
         setInterval(() => {
             sekunderIgjen--;
             if (sekunderIgjen <= 0) {
