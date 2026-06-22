@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fly over Tromsø</title>
+    <title>Fly over Gardermoen</title>
     <style>
         /* E-ink optimalisert stil: Kun sort/hvitt og høy kontrast */
         body {
@@ -34,10 +34,6 @@
             cursor: pointer;
             margin-bottom: 15px;
         }
-        button:active {
-            background-color: #000000;
-            color: #ffffff;
-        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -59,7 +55,7 @@
 </head>
 <body>
 
-    <h1>FLY OVER TROMSØ</h1>
+    <h1>FLY OVER GARDERMOEN</h1>
     <div class="meta">
         Sist oppdatert: <span id="time">-</span><br>
         Neste automatiske oppdatering om: <span id="teller">30</span>s
@@ -67,15 +63,15 @@
 
     <button onclick="nullstillOgHent()">OPPDATER NÅ</button>
 
-    <div id="status" class="loading">Henter data...</div>
+    <div id="status" class="loading">Henter data fra Flightradar24...</div>
     
     <table id="flyTabell" style="display: none;">
         <thead>
             <tr>
                 <th>Fly / Rute</th>
-                <th>Høyde (m)</th>
-                <th>Fart (km/t)</th>
-                <th>Retning</th>
+                <th>Fra -> Til</th>
+                <th>Høyde (fot)</th>
+                <th>Fart (knop)</th>
             </tr>
         </thead>
         <tbody id="flyData">
@@ -83,8 +79,11 @@
     </table>
 
     <script>
-        const url = "https://corsproxy.io/?https://opensky-network.org/api/states/all?lamin=69.5%26lamax=69.8%26lomin=18.5%26lomax=19.5";
-        const oppdateringsFrekvens Sekunder = 30; // Hvor ofte den skal oppdatere seg (i sekunder)
+        // Geografisk boks oppdatert til Gardermoen-området (OSL)
+        // Format: Nord, Sør, Vest, Øst
+        const url = "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.30,60.10,10.90,11.30&faa=1&flight_states=1&satellite=1&mlat=1&flarm=1&adsb=1&gnd=1&air=1&vehicles=1&estimated=1";
+        
+        const oppdateringsFrekvensSekunder = 30;
         let sekunderIgjen = oppdateringsFrekvensSekunder;
 
         async function hentFlydata() {
@@ -105,8 +104,11 @@
                 const nå = new Date();
                 tidsEl.innerText = nå.toLocaleTimeString("no-NO");
 
-                if (!data.states || data.states.length === 0) {
-                    statusEl.innerText = "Ingen fly i luftrommet akkurat nå.";
+                // Filtrer bort metadata fra Flightradar24
+                const flyNøkler = Object.keys(data).filter(key => key !== "full_count" && key !== "version" && key !== "stats");
+
+                if (flyNøkler.length === 0) {
+                    statusEl.innerText = "Ingen fly registrert rundt Gardermoen akkurat nå.";
                     tabellEl.style.display = "none";
                     return;
                 }
@@ -114,36 +116,38 @@
                 statusEl.style.display = "none";
                 tabellEl.style.display = "table";
 
-                data.states.forEach(fly => {
-                    const rute = fly[1] && fly[1].trim() !== "" ? fly[1].trim() : "Ukjent";
-                    const høyde = fly[7] ? Math.round(fly[7]) : "-";
-                    const fart = fly[9] ? Math.round(fly[9] * 3.6) : "-"; 
-                    const retning = fly[10] ? Math.round(fly[10]) + "°" : "-";
+                flyNøkler.forEach(nøkkel => {
+                    const flyinfo = data[nøkkel];
+                    
+                    // Hent ut rutenummer, flyplasser, høyde og fart
+                    const rute = flyinfo[13] && flyinfo[13] !== "" ? flyinfo[13] : (flyinfo[16] ? flyinfo[16] : "Ukjent");
+                    const fra = flyinfo[11] || "???";
+                    const til = flyinfo[12] || "???";
+                    const høyde = flyinfo[4] === 0 ? "Bakken" : flyinfo[4] + " ft";
+                    const fart = flyinfo[5] + " kt";
 
                     const rad = document.createElement("tr");
                     rad.innerHTML = `
                         <td><strong>${rute}</strong></td>
-                        <td>${høyde}m</td>
+                        <td>${fra} -> ${til}</td>
+                        <td>${høyde}</td>
                         <td>${fart}</td>
-                        <td>${retning}</td>
                     `;
                     dataBoks.appendChild(rad);
                 });
 
             } catch (error) {
-                statusEl.innerText = "Feil ved henting av data. Prøv igjen.";
+                statusEl.innerText = "Kunne ikke kontakte Flightradar24. Sjekk nettet.";
                 console.error(error);
             }
         }
 
-        // Funksjon for den manuelle knappen, som også nullstiller timeren
         function nullstillOgHent() {
             sekunderIgjen = oppdateringsFrekvensSekunder;
             document.getElementById("teller").innerText = sekunderIgjen;
             hentFlydata();
         }
 
-        // Nedteller-funksjon som kjører hvert sekund
         setInterval(() => {
             sekunderIgjen--;
             if (sekunderIgjen <= 0) {
@@ -153,7 +157,6 @@
             document.getElementById("teller").innerText = sekunderIgjen;
         }, 1000);
 
-        // Første oppstart når siden lastes
         hentFlydata();
     </script>
 
