@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gardermoen (Sortert etter avstand)</title>
+    <title>Gardermoen (Kun fly i lufta)</title>
     <style>
         /* E-ink optimalisert stil: Kun sort/hvitt og høy kontrast */
         body {
@@ -55,7 +55,7 @@
 </head>
 <body>
 
-    <h1>GARDERMOEN (10KM - LENGST UNNA ØVERST)</h1>
+    <h1>GARDERMOEN (KUN I LUFTA - LENGST UNNA ØVERST)</h1>
     <div class="meta">
         Sist oppdatert: <span id="time">-</span><br>
         Neste automatiske oppdatering om: <span id="teller">30</span>s
@@ -63,7 +63,7 @@
 
     <button onclick="nullstillOgHent()">OPPDATER NÅ</button>
 
-    <div id="status" class="loading">Henter og sorterer data...</div>
+    <div id="status" class="loading">Henter og sorterer luftbårne fly...</div>
     
     <table id="flyTabell" style="display: none;">
         <thead>
@@ -79,17 +79,17 @@
     </table>
 
     <script>
-        // Sentrumskoordinater for Gardermoen terminal (brukes som målepunkt)
+        // Sentrumskoordinater for Gardermoen terminal
         const mittPunktLat = 60.197;
         const mittPunktLon = 11.096;
 
         // API-URL (10 km radius boks)
-        const url = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.287,60.107,10.916,11.276%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=1%26estimated=1";
+        const url = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.287,60.107,10.916,11.276%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=0%26air=1%26vehicles=0%26estimated=1";
         
         const oppdateringsFrekvensSekunder = 30;
         let sekunderIgjen = oppdateringsFrekvensSekunder;
 
-        // Enkel funksjon for å regne ut omtrentlig avstand i km (lettvektig for svakere CPU)
+        // Enkel funksjon for å regne ut omtrentlig avstand i km
         function kalkulerAvstand(lat1, lon1, lat2, lon2) {
             const x = (lon2 - lon1) * Math.cos((lat1 + lat2) / 2 * Math.PI / 180) * 111.32;
             const y = (lat2 - lat1) * 111.13;
@@ -117,39 +117,51 @@
                 const flyNøkler = Object.keys(data).filter(key => key !== "full_count" && key !== "version" && key !== "stats");
 
                 if (flyNøkler.length === 0) {
-                    statusEl.innerText = "Ingen fly i området akkurat nå.";
+                    statusEl.innerText = "Ingen fly i lufta innenfor 10 km akkurat nå.";
                     tabellEl.style.display = "none";
                     return;
                 }
 
-                // Generer en liste med objekter slik at vi kan sortere dem
                 let flyListe = [];
 
                 flyNøkler.forEach(nøkkel => {
                     const flyinfo = data[nøkkel];
+                    
                     const flyLat = flyinfo[1];
                     const flyLon = flyinfo[2];
+                    const altitude = flyinfo[4]; // Høyde i fot
+
+                    // KRITISK FILTER: Dropp flyet hvis det står på bakken eller har 0 fot i høyde
+                    const påBakken = flyinfo[14] === 1; // Flightradar flagg for ground
+                    if (altitude <= 0 || påBakken) {
+                        return; // Hopper over dette flyet og går til neste
+                    }
                     
-                    // Regn ut avstand fra Gardermoen til dette spesifikke flyet
                     const avstandKm = kalkulerAvstand(mittPunktLat, mittPunktLon, flyLat, flyLon);
 
                     flyListe.push({
                         rute: flyinfo[13] && flyinfo[13] !== "" ? flyinfo[13] : (flyinfo[16] ? flyinfo[16] : "Ukjent"),
                         fra: flyinfo[11] || "???",
                         til: flyinfo[12] || "???",
-                        høyde: flyinfo[4] === 0 ? "Bakken" : flyinfo[4] + " ft",
+                        høyde: altitude + " ft",
                         fart: flyinfo[5] + " kt",
                         avstand: avstandKm
                     });
                 });
 
-                // Sorter listen: Størst avstand (lengst unna) havner øverst (b - a)
+                // Hvis alle flyene i boksen sto på bakken, kan listen bli tom etter filtrering
+                if (flyListe.length === 0) {
+                    statusEl.innerText = "Ingen fly i lufta innenfor 10 km akkurat nå.";
+                    tabellEl.style.display = "none";
+                    return;
+                }
+
+                // Sorter listen: Størst avstand (lengst unna) havner øverst
                 flyListe.sort((a, b) => b.avstand - a.avstand);
 
                 statusEl.style.display = "none";
                 tabellEl.style.display = "table";
 
-                // Tegn opp de ferdig sorterte radene i tabellen
                 flyListe.forEach(fly => {
                     const rad = document.createElement("tr");
                     rad.innerHTML = `
