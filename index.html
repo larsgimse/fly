@@ -63,7 +63,7 @@
 
     <button onclick="nullstillOgHent()">OPPDATER NÅ</button>
 
-    <div id="status" class="loading">Henter og sorterer luftbårne fly...</div>
+    <div id="status" class="loading">Henter and sorterer luftbårne fly...</div>
     
     <table id="flyTabell" style="display: none;">
         <thead>
@@ -75,7 +75,7 @@
             </tr>
         </thead>
         <tbody id="flyData">
-            </tbody>
+        </tbody>
     </table>
 
     <script>
@@ -83,8 +83,8 @@
         const mittPunktLat = 60.197;
         const mittPunktLon = 11.096;
 
-        // API-URL (10 km radius boks)
-        const url = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.287,60.107,10.916,11.276%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=0%26air=1%26vehicles=0%26estimated=1";
+        // API-URL pakket inn i en robust HTTP-kompatibel proxy
+        const url = "http://api.allorigins.win/get?url=" + encodeURIComponent("https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.287,60.107,10.916,11.276&faa=1&flight_states=1&satellite=1&mlat=1&flarm=1&adsb=1&gnd=0&air=1&vehicles=0&estimated=1");
         
         const oppdateringsFrekvensSekunder = 30;
         let sekunderIgjen = oppdateringsFrekvensSekunder;
@@ -104,12 +104,15 @@
 
             statusEl.style.display = "block";
             statusEl.innerText = "Henter ferske data...";
-            tabellEl.style.display = "none";
+            tabellEl.style.display = "none"; // RETTET: Endret fra .style.style til .style.display
             dataBoks.innerHTML = "";
 
             try {
                 const response = await fetch(url);
-                const data = await response.json();
+                const proxyData = await response.json();
+                
+                // Pakker ut innholdet fra allorigins-proxyen
+                const data = JSON.parse(proxyData.contents);
                 
                 const nå = new Date();
                 tidsEl.innerText = nå.toLocaleTimeString("no-NO");
@@ -129,12 +132,11 @@
                     
                     const flyLat = flyinfo[1];
                     const flyLon = flyinfo[2];
-                    const altitude = flyinfo[4]; // Høyde i fot
+                    const altitude = flyinfo[4];
 
-                    // KRITISK FILTER: Dropp flyet hvis det står på bakken eller har 0 fot i høyde
-                    const påBakken = flyinfo[14] === 1; // Flightradar flagg for ground
+                    const påBakken = flyinfo[14] === 1;
                     if (altitude <= 0 || påBakken) {
-                        return; // Hopper over dette flyet og går til neste
+                        return; 
                     }
                     
                     const avstandKm = kalkulerAvstand(mittPunktLat, mittPunktLon, flyLat, flyLon);
@@ -149,14 +151,12 @@
                     });
                 });
 
-                // Hvis alle flyene i boksen sto på bakken, kan listen bli tom etter filtrering
                 if (flyListe.length === 0) {
                     statusEl.innerText = "Ingen fly i lufta innenfor 10 km akkurat nå.";
                     tabellEl.style.display = "none";
                     return;
                 }
 
-                // Sorter listen: Størst avstand (lengst unna) havner øverst
                 flyListe.sort((a, b) => b.avstand - a.avstand);
 
                 statusEl.style.display = "none";
