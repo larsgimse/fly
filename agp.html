@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flyradar Lokal (OSL & AGP)</title>
+    <title>Flyradar (AGP & OSL)</title>
     <style>
         body {
             font-family: monospace, sans-serif;
@@ -68,20 +68,6 @@
 
     <button onclick="nullstillOgHent()">OPPDATER NÅ!</button>
 
-    <h2>GARDERMOEN (OSL)</h2>
-    <div id="statusOsl" class="loading">Henter ferske data...</div>
-    <table id="tabellOsl" style="display: none;">
-        <thead>
-            <tr>
-                <th>Fly / Rute</th>
-                <th>Fra -> Til</th>
-                <th>Høyde/Fart</th>
-                <th>Retn. / Avstand</th>
-            </tr>
-        </thead>
-        <tbody id="dataOsl"></tbody>
-    </table>
-
     <h2>MÁLAGA (AGP)</h2>
     <div id="statusAgp" class="loading">Henter ferske data...</div>
     <table id="tabellAgp" style="display: none;">
@@ -96,31 +82,42 @@
         <tbody id="dataAgp"></tbody>
     </table>
 
+    <h2>GARDERMOEN (OSL)</h2>
+    <div id="statusOsl" class="loading">Henter ferske data...</div>
+    <table id="tabellOsl" style="display: none;">
+        <thead>
+            <tr>
+                <th>Fly / Rute</th>
+                <th>Fra -> Til</th>
+                <th>Høyde/Fart</th>
+                <th>Retn. / Avstand</th>
+            </tr>
+        </thead>
+        <tbody id="dataOsl"></tbody>
+    </table>
+
     <div class="meta">
         Sist oppdatert: <span id="time">-</span><br>
         Neste automatiske oppdatering om: <span id="teller">30</span>s
     </div>
 
     <script>
-        // Konfigurasjon og koordinater for Gardermoen og Malaga
         var flyplasser = {
-            osl: {
-                lat: 60.197,
-                lon: 11.096,
-                // Dekker luftrommet rundt Gardermoen
-                url: "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.480,59.910,10.510,11.680&faa=1&flight_states=1&satellite=1&mlat=1&flarm=1&adsb=1&gnd=0&air=1&vehicles=0&estimated=1",
-                statusElId: "statusOsl",
-                tabellElId: "tabellOsl",
-                dataElId: "dataOsl"
-            },
             agp: {
                 lat: 36.674,
                 lon: -4.499,
-                // Dekker luftrommet rundt Malaga (AGP)
                 url: "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=36.950,36.400,-5.100,-3.900&faa=1&flight_states=1&satellite=1&mlat=1&flarm=1&adsb=1&gnd=0&air=1&vehicles=0&estimated=1",
                 statusElId: "statusAgp",
                 tabellElId: "tabellAgp",
                 dataElId: "dataAgp"
+            },
+            osl: {
+                lat: 60.197,
+                lon: 11.096,
+                url: "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.480,59.910,10.510,11.680&faa=1&flight_states=1&satellite=1&mlat=1&flarm=1&adsb=1&gnd=0&air=1&vehicles=0&estimated=1",
+                statusElId: "statusOsl",
+                tabellElId: "tabellOsl",
+                dataElId: "dataOsl"
             }
         };
                 
@@ -137,9 +134,9 @@
             if (grader === undefined || grader === null) return "?";
             var g = grader % 360;
             if (g >= 337.5 || g < 22.5)  return "&#8593;";  // N (↑)
-            if (g >= 22.5  and g < 67.5)  return "&#8599;";  // NØ (↗)
-            if (g >= 67.5  and g < 112.5) return "&#8594;";  // Ø (→)
-            if (g >= 112.5 and g < 157.5) return "&#8600;";  // SØ (↘)
+            if (g >= 22.5  && g < 67.5)  return "&#8599;";  // NØ (↗)
+            if (g >= 67.5  && g < 112.5) return "&#8594;";  // Ø (→)
+            if (g >= 112.5 && g < 157.5) return "&#8600;";  // SØ (↘)
             if (g >= 157.5 and g < 202.5) return "&#8595;";  // S (↓)
             if (g >= 202.5 and g < 247.5) return "&#8601;";  // SV (↙)
             if (g >= 247.5 and g < 292.5) return "&#8592;";  // V (←)
@@ -158,8 +155,7 @@
             tabellEl.style.display = "none";
             dataBoks.innerHTML = "";
 
-            // Bruker en solid CORS-proxy spesielt for lokal kjøring på din maskin
-            var proxyUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(fp.url) + "&_=" + new Date().getTime();
+            var proxyUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(fp.url) + "&_" + new Date().getTime();
 
             var xhr = new XMLHttpRequest();
             xhr.open("GET", proxyUrl, true);
@@ -190,7 +186,6 @@
                                         
                                     var avstandKm = kalkulerAvstand(fp.lat, fp.lon, flyLat, flyLon);
 
-                                    // Filter: Kun fly innenfor 30 km radius
                                     if (avstandKm > 30.0) {
                                         continue;
                                     }
@@ -215,12 +210,10 @@
                                 return;
                             }
 
-                            // Sorterer etter avstand (nærmest øverst)
                             flyListe.sort(function (a, b) {
                                 return a.avstand - b.avstand;
                             });
                             
-                            // Viser maks top 7 fly for ren oversikt
                             var maksSyvFly = flyListe.slice(0, 7);
 
                             statusEl.style.display = "none";
@@ -253,8 +246,8 @@
         function oppdaterAlle() {
             var nå = new Date();
             document.getElementById("time").innerText = nå.toLocaleTimeString("no-NO");
-            hentDataForFlyplass("osl");
             hentDataForFlyplass("agp");
+            hentDataForFlyplass("osl");
         }
 
         function nullstillOgHent() {
@@ -272,7 +265,6 @@
             document.getElementById("teller").innerText = sekunderIgjen;
         }, 1000);
 
-        // Første oppstart når siden åpnes
         oppdaterAlle();
     </script>
 </body>
