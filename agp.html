@@ -3,24 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flyradar (AGP & OSL)</title>
+    <title>Flyradar (Nook Kompatibel)</title>
     <style>
+        /* E-ink optimalisert stil: Kun sort/hvitt og høy kontrast */
         body {
             font-family: monospace, sans-serif;
             background-color: #ffffff;
             color: #000000;
-            padding: 15px;
+            padding: 10px;
             margin: 0;
         }
         h2 {
             margin-bottom: 5px;
             border-bottom: 2px solid #000000;
             padding-bottom: 5px;
-            font-size: 1.3rem;
-            margin-top: 20px;
+            font-size: 1.2rem;
+            margin-top: 15px;
         }
         .meta {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             margin-top: 25px;
             border-top: 1px dashed #000000;
             padding-top: 10px;
@@ -30,17 +31,13 @@
             background-color: #ffffff;
             color: #000000;
             border: 2px solid #000000;
-            padding: 10px 15px;
+            padding: 8px 15px;
             font-size: 1rem;
             font-weight: bold;
             cursor: pointer;
             margin-bottom: 10px;
-            width: 100%;
+            width: 100%; /* Gjør knappen lett å treffe på e-ink */
             box-sizing: border-box;
-        }
-        button:hover {
-            background-color: #000000;
-            color: #ffffff;
         }
         table {
             width: 100%;
@@ -51,7 +48,7 @@
         th, td {
             border-bottom: 1px solid #000000;
             text-align: left;
-            padding: 8px 4px;
+            padding: 6px 4px;
             font-size: 0.9rem;
         }
         th {
@@ -66,7 +63,7 @@
 </head>
 <body>
 
-    <button onclick="nullstillOgHent()">OPPDATER NÅ!</button>
+    <button onclick="nullstillOgHent()">OPPDATER NÅ</button>
 
     <h2>MÁLAGA (AGP)</h2>
     <div id="statusAgp" class="loading">Henter ferske data...</div>
@@ -82,7 +79,7 @@
         <tbody id="dataAgp"></tbody>
     </table>
 
-    <h2>GARDERMOEN (OSL)</h2>
+    <h2>GARDERMOEN</h2>
     <div id="statusOsl" class="loading">Henter ferske data...</div>
     <table id="tabellOsl" style="display: none;">
         <thead>
@@ -102,11 +99,12 @@
     </div>
 
     <script>
+        // Koordinater og API-bokser for flyplassene
         var flyplasser = {
             agp: {
                 lat: 36.674,
                 lon: -4.499,
-                url: "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=36.950,36.400,-5.100,-3.900&faa=1&flight_states=1&satellite=1&mlat=1&flarm=1&adsb=1&gnd=0&air=1&vehicles=0&estimated=1",
+                url: "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=36.950,36.400,-5.100,-3.900%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=0%26air=1%26vehicles=0%26estimated=1",
                 statusElId: "statusAgp",
                 tabellElId: "tabellAgp",
                 dataElId: "dataAgp"
@@ -114,7 +112,7 @@
             osl: {
                 lat: 60.197,
                 lon: 11.096,
-                url: "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.480,59.910,10.510,11.680&faa=1&flight_states=1&satellite=1&mlat=1&flarm=1&adsb=1&gnd=0&air=1&vehicles=0&estimated=1",
+                url: "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.480,59.910,10.510,11.680%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=0%26air=1%26vehicles=0%26estimated=1",
                 statusElId: "statusOsl",
                 tabellElId: "tabellOsl",
                 dataElId: "dataOsl"
@@ -137,10 +135,10 @@
             if (g >= 22.5  && g < 67.5)  return "&#8599;";  // NØ (↗)
             if (g >= 67.5  && g < 112.5) return "&#8594;";  // Ø (→)
             if (g >= 112.5 && g < 157.5) return "&#8600;";  // SØ (↘)
-            if (g >= 157.5 and g < 202.5) return "&#8595;";  // S (↓)
-            if (g >= 202.5 and g < 247.5) return "&#8601;";  // SV (↙)
-            if (g >= 247.5 and g < 292.5) return "&#8592;";  // V (←)
-            if (g >= 292.5 and g < 337.5) return "&#8598;";  // NV (↖)
+            if (g >= 157.5 && g < 202.5) return "&#8595;";  // S (↓)
+            if (g >= 202.5 && g < 247.5) return "&#8601;";  // SV (↙)
+            if (g >= 247.5 && g < 292.5) return "&#8592;";  // V (←)
+            if (g >= 292.5 && g < 337.5) return "&#8598;";  // NV (↖)
             return "?";
         }
 
@@ -155,17 +153,17 @@
             tabellEl.style.display = "none";
             dataBoks.innerHTML = "";
 
-            var proxyUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(fp.url) + "&_" + new Date().getTime();
-
             var xhr = new XMLHttpRequest();
-            xhr.open("GET", proxyUrl, true);
+            var uniktTidsstempel = new Date().getTime();
+            var urlMedCacheBuster = fp.url + "%26_=" + uniktTidsstempel;
+
+            xhr.open("GET", urlMedCacheBuster, true);
             
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
                         try {
-                            var jsonResponskapsel = JSON.parse(xhr.responseText);
-                            var data = JSON.parse(jsonResponskapsel.contents);
+                            var data = JSON.parse(xhr.responseText);
                             var flyListe = [];
 
                             for (var nøkkel in data) {
@@ -227,7 +225,7 @@
                                 rad.innerHTML = "<td><strong>" + fly.rute + "</strong><br><small>" + fly.type + " (" + fly.reg + ")</small></td>" +
                                                 "<td>" + fly.fra + " -> " + fly.til + "</td>" +
                                                 "<td>" + fly.høyde + "<br>" + fly.fart + "</td>" +
-                                                "<td><span style='font-size:1.1rem; font-weight:bold;'>" + pil + "</span> " + fly.avstand.toFixed(1) + " km</td>";
+                                                "<td><span style='font-size:1.2rem; font-weight:bold;'>" + pil + "</span> " + fly.avstand.toFixed(1) + " km</td>";
                                 dataBoks.appendChild(rad);
                             }
 
@@ -236,14 +234,14 @@
                             console.error(e);
                         }
                     } else {
-                        statusEl.innerText = "Tilkoblingsfeil (Status: " + xhr.status + ")";
+                        statusEl.innerText = "Kunne ikke kontakte server (Status: " + xhr.status + ")";
                     }
                 }
             };
             xhr.send();
         }
 
-        function oppdaterAlle() {
+        function oppdaterAlleFlyplasser() {
             var nå = new Date();
             document.getElementById("time").innerText = nå.toLocaleTimeString("no-NO");
             hentDataForFlyplass("agp");
@@ -253,19 +251,19 @@
         function nullstillOgHent() {
             sekunderIgjen = oppdateringsFrekvensSekunder;
             document.getElementById("teller").innerText = sekunderIgjen;
-            oppdaterAlle();
+            oppdaterAlleFlyplasser();
         }
 
         setInterval(function () {
             sekunderIgjen--;
             if (sekunderIgjen <= 0) {
                 sekunderIgjen = oppdateringsFrekvensSekunder;
-                oppdaterAlle();
+                oppdaterAlleFlyplasser();
             }
             document.getElementById("teller").innerText = sekunderIgjen;
         }, 1000);
 
-        oppdaterAlle();
+        oppdaterAlleFlyplasser();
     </script>
 </body>
 </html>
