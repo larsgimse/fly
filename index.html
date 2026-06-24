@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flyradar (Gratis GitHub-versjon)</title>
+    <title>Flyradar (GitHub Pages Stabil)</title>
     <style>
         body {
             font-family: monospace, sans-serif;
@@ -141,16 +141,13 @@
     </div>
 
     <script>
-        // En åpen proxy som videresender forespørselen slik at Avinor ikke blokkerer GitHub Pages
-        var avinorProxy = "https://thingproxy.freeboard.io/fetch/";
-
         var flyplasser = {
             osl: {
                 kode: "OSL",
                 lat: 60.197,
                 lon: 11.096,
                 url: "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.480,59.910,10.510,11.680%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=0%26air=1%26vehicles=0%26estimated=1",
-                avinorUrl: avinorProxy + "https://data.avinor.no/flightdata/v1/airport/OSL/arrivals?TimeWindow=1",
+                avinorRawUrl: "https://data.avinor.no/flightdata/v1/airport/OSL/arrivals?TimeWindow=1",
                 statusElId: "statusOsl",
                 seksjonIluftaId: "seksjonIluftaOsl",
                 seksjonLandetId: "seksjonLandetOsl",
@@ -162,7 +159,7 @@
                 lat: 69.683,
                 lon: 18.919,
                 url: "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=69.960,69.400,18.150,19.680%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=0%26air=1%26vehicles=0%26estimated=1",
-                avinorUrl: avinorProxy + "https://data.avinor.no/flightdata/v1/airport/TOS/arrivals?TimeWindow=1",
+                avinorRawUrl: "https://data.avinor.no/flightdata/v1/airport/TOS/arrivals?TimeWindow=1",
                 statusElId: "statusTos",
                 seksjonIluftaId: "seksjonIluftaTos",
                 seksjonLandetId: "seksjonLandetTos",
@@ -212,57 +209,61 @@
             var dataLandetBoks = document.getElementById(fp.dataLandetElId);
             var seksjonLandet = document.getElementById(fp.seksjonLandetId);
 
-            var avinorXhr = new XMLHttpRequest();
-            avinorXhr.open("GET", fp.avinorUrl + "&_cb=" + new Date().getTime(), true);
-            avinorXhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+            // Vi bruker AllOrigins proxy med JSONP for å tvinge igjennom store data uten CORS-sperre
+            var script = document.createElement('script');
+            var callbackNavn = 'callback_avinor_' + id + '_' + new Date().getTime();
+            
+            window[callbackNavn] = function(data) {
+                try {
+                    var parser = new DOMParser();
+                    var xmlDoc = parser.parseFromString(data.contents, "text/xml");
+                    var flights = xmlDoc.getElementsByTagName("flight");
+                    var nåTid = new Date().getTime();
+                    var htmlInnhold = "";
 
-            avinorXhr.onreadystatechange = function() {
-                if (avinorXhr.readyState === 4 && avinorXhr.status === 200) {
-                    try {
-                        var parser = new DOMParser();
-                        var xmlDoc = parser.parseFromString(avinorXhr.responseText, "text/xml");
-                        var flights = xmlDoc.getElementsByTagName("flight");
-                        var nåTid = new Date().getTime();
-                        var htmlInnhold = "";
+                    for (var i = 0; i < flights.length; i++) {
+                        var statusElXml = flights[i].getElementsByTagName("status")[0];
+                        
+                        if (statusElXml && statusElXml.getAttribute("code") === "A") {
+                            var actualTimeStr = flights[i].getElementsByTagName("actualTime")[0];
+                            if (actualTimeStr) {
+                                var landetTidspunkt = new Date(actualTimeStr.textContent || actualTimeStr.innerText).getTime();
+                                var tidsDiffMinutter = (nåTid - landetTidspunkt) / 1000 / 60;
 
-                        for (var i = 0; i < flights.length; i++) {
-                            var statusElXml = flights[i].getElementsByTagName("status")[0];
-                            
-                            if (statusElXml && statusElXml.getAttribute("code") === "A") {
-                                var actualTimeStr = flights[i].getElementsByTagName("actualTime")[0];
-                                if (actualTimeStr) {
-                                    var landetTidspunkt = new Date(actualTimeStr.textContent || actualTimeStr.innerText).getTime();
-                                    var tidsDiffMinutter = (nåTid - landetTidspunkt) / 1000 / 60;
+                                if (tidsDiffMinutter >= 0 && tidsDiffMinutter <= 15) {
+                                    var fId = flights[i].getElementsByTagName("flight_id")[0];
+                                    var airportEl = flights[i].getElementsByTagName("airport")[0];
+                                    var gateEl = flights[i].getElementsByTagName("gate")[0];
 
-                                    if (tidsDiffMinutter >= 0 && tidsDiffMinutter <= 15) {
-                                        var fId = flights[i].getElementsByTagName("flight_id")[0];
-                                        var airportEl = flights[i].getElementsByTagName("airport")[0];
-                                        var gateEl = flights[i].getElementsByTagName("gate")[0];
+                                    var rute = fId ? (fId.textContent || fId.innerText) : "Ukjent";
+                                    var fra = airportEl ? (airportEl.textContent || airportEl.innerText) : "???";
+                                    var gate = gateEl ? (gateEl.textContent || gateEl.innerText) : "-";
+                                    var tidTekst = Math.floor(tidsDiffMinutter) + "m " + Math.floor((tidsDiffMinutter % 1) * 60) + "s siden";
 
-                                        var rute = fId ? (fId.textContent || fId.innerText) : "Ukjent";
-                                        var fra = airportEl ? (airportEl.textContent || airportEl.innerText) : "???";
-                                        var gate = gateEl ? (gateEl.textContent || gateEl.innerText) : "-";
-                                        var tidTekst = Math.floor(tidsDiffMinutter) + "m " + Math.floor((tidsDiffMinutter % 1) * 60) + "s siden";
-
-                                        htmlInnhold += "<tr><td><strong>" + rute + "</strong><br><small>✓ LANDET</small></td>" +
-                                                       "<td>" + fra + " -> " + fp.kode + "</td>" +
-                                                       "<td>" + tidTekst + "<br><strong>Gate: " + gate + "</strong></td></tr>";
-                                    }
+                                    htmlInnhold += "<tr><td><strong>" + rute + "</strong><br><small>✓ LANDET</small></td>" +
+                                                   "<td>" + fra + " -> " + fp.kode + "</td>" +
+                                                   "<td>" + tidTekst + "<br><strong>Gate: " + gate + "</strong></td></tr>";
                                 }
                             }
                         }
-
-                        if (htmlInnhold !== "") {
-                            dataLandetBoks.innerHTML = htmlInnhold;
-                            seksjonLandet.style.display = "block";
-                            document.getElementById(fp.statusElId).style.display = "none";
-                        }
-                    } catch(e) {
-                        console.error("Feil ved tolking av Avinor-XML: ", e);
                     }
+
+                    if (htmlInnhold !== "") {
+                        dataLandetBoks.innerHTML = htmlInnhold;
+                        seksjonLandet.style.display = "block";
+                        document.getElementById(fp.statusElId).style.display = "none";
+                    }
+                } catch(e) {
+                    console.error("Feil ved tolking av Avinor-XML: ", e);
                 }
+                
+                // Rydd opp global funksjon og script-tag etter bruk
+                delete window[callbackNavn];
+                script.parentNode.removeChild(script);
             };
-            avinorXhr.send();
+
+            script.src = "https://api.allorigins.win/get?url=" + encodeURIComponent(fp.avinorRawUrl + "&_cb=" + new Date().getTime()) + "&callback=" + callbackNavn;
+            document.body.appendChild(script);
         }
 
         function hentFlightradarData(id) {
