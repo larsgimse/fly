@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flyradar (Nook Kompatibel)</title>
+    <style>
+        /* E-ink optimalisert stil: Kun sort/hvitt og høy kontrast */
+        body {
+            font-family: monospace, sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            padding: 10px;
+            margin: 0;
+        }
+        h2 {
+            margin-bottom: 5px;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 5px;
+            font-size: 1.2rem;
+            margin-top: 15px;
+        }
+        .meta {
+            font-size: 0.8rem;
+            margin-top: 25px;
+            border-top: 1px dashed #000000;
+            padding-top: 10px;
+            line-height: 1.4;
+        }
+        button {
+            background-color: #ffffff;
+            color: #000000;
+            border: 2px solid #000000;
+            padding: 8px 15px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+            width: 100%; /* Gjør knappen lett å treffe på e-ink */
+            box-sizing: border-box;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+            margin-bottom: 15px;
+        }
+        th, td {
+            border-bottom: 1px solid #000000;
+            text-align: left;
+            padding: 6px 4px;
+            font-size: 0.9rem;
+        }
+        th {
+            font-weight: bold;
+        }
+        .loading {
+            font-style: italic;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <button onclick="nullstillOgHent()">OPPDATER NÅ</button>
+
+    <h2>GARDERMOEN</h2>
+    <div id="statusOsl" class="loading">Henter ferske data...</div>
+    <table id="tabellOsl" style="display: none;">
+        <thead>
+            <tr>
+                <th>Fly / Rute</th>
+                <th>Fra -> Til</th>
+                <th>Høyde/Fart</th>
+                <th>Retn. / Avstand</th>
+            </tr>
+        </thead>
+        <tbody id="dataOsl"></tbody>
+    </table>
+
+    <h2>TROMSØ</h2>
+    <div id="statusTos" class="loading">Henter ferske data...</div>
+    <table id="tabellTos" style="display: none;">
+        <thead>
+            <tr>
+                <th>Fly / Rute</th>
+                <th>Fra -> Til</th>
+                <th>Høyde/Fart</th>
+                <th>Retn. / Avstand</th>
+            </tr>
+        </thead>
+        <tbody id="dataTos"></tbody>
+    </table>
+
+    <div class="meta">
+        Sist oppdatert: <span id="time">-</span><br>
+        Neste automatiske oppdatering om: <span id="teller">30</span>s
+    </div>
+
+    <script>
+        // Koordinater og API-bokser for flyplassene
+        var flyplasser = {
+            osl: {
+                lat: 60.197,
+                lon: 11.096,
+                url: "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.480,59.910,10.510,11.680%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=0%26air=1%26vehicles=0%26estimated=1",
+                statusElId: "statusOsl",
+                tabellElId: "tabellOsl",
+                dataElId: "dataOsl"
+            },
+            tos: {
+                lat: 69.683,
+                lon: 18.919,
+                url: "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=69.960,69.400,18.150,19.680%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=0%26air=1%26vehicles=0%26estimated=1",
+                statusElId: "statusTos",
+                tabellElId: "tabellTos",
+                dataElId: "dataTos"
+            }
+        };
+                
+        var oppdateringsFrekvensSekunder = 30;
+        var sekunderIgjen = oppdateringsFrekvensSekunder;
+
+        function kalkulerAvstand(lat1, lon1, lat2, lon2) {
+            var x = (lon2 - lon1) * Math.cos((lat1 + lat2) / 2 * Math.PI / 180) * 111.32;
+            var y = (lat2 - lat1) * 111.13;
+            return Math.sqrt(x * x + y * y);
+        }
+
+        function hentRetningsPil(grader) {
+            if (grader === undefined || grader === null) return "?";
+            var g = grader % 360;
+            if (g >= 337.5 || g < 22.5)  return "&#8593;";  // N (↑)
+            if (g >= 22.5  && g < 67.5)  return "&#8599;";  // NØ (↗)
+            if (g >= 67.5  && g < 112.5) return "&#8594;";  // Ø (→)
+            if (g >= 112.5 && g < 157.5) return "&#8600;";  // SØ (↘)
+            if (g >= 157.5 && g < 202.5) return "&#8595;";  // S (↓)
+            if (g >= 202.5 && g < 247.5) return "&#8601;";  // SV (↙)
+            if (g >= 247.5 && g < 292.5) return "&#8592;";  // V (←)
+            if (g >= 292.5 && g < 337.5) return "&#8598;";  // NV (↖)
+            return "?";
+        }
+
+        function hentDataForFlyplass(id) {
+            var fp = flyplasser[id];
+            var statusEl = document.getElementById(fp.statusElId);
+            var tabellEl = document.getElementById(fp.tabellElId);
+            var dataBoks = document.getElementById(fp.dataElId);
+
+            statusEl.style.display = "block";
+            statusEl.innerText = "Henter ferske data...";
+            tabellEl.style.display = "none";
+            dataBoks.innerHTML = "";
+
+            var xhr = new XMLHttpRequest();
+            var uniktTidsstempel = new Date().getTime();
+            var urlMedCacheBuster = fp.url + "%26_=" + uniktTidsstempel;
+
+            xhr.open("GET", urlMedCacheBuster, true);
+            
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var data = JSON.parse(xhr.responseText);
+                            var flyListe = [];
+
+                            for (var nøkkel in data) {
+                                if (data.hasOwnProperty(nøkkel) && nøkkel !== "full_count" && nøkkel !== "version" && nøkkel !== "stats") {
+                                    var flyinfo = data[nøkkel];
+                                    
+                                    var flyLat = flyinfo[1];
+                                    var flyLon = flyinfo[2];
+                                    var heading = flyinfo[3];
+                                    var altitude = flyinfo[4];
+                                    var flytype = flyinfo[8] || "Ukjent";
+                                    var regNummer = flyinfo[9] || "Mangler reg.";
+                                    var påBakken = flyinfo[14] === 1;
+
+                                    if (altitude <= 0 || påBakken) {
+                                        continue; 
+                                    }
+                                        
+                                    var avstandKm = kalkulerAvstand(fp.lat, fp.lon, flyLat, flyLon);
+
+                                    if (avstandKm > 30.0) {
+                                        continue;
+                                    }
+
+                                    flyListe.push({
+                                        rute: flyinfo[13] && flyinfo[13] !== "" ? flyinfo[13] : (flyinfo[16] ? flyinfo[16] : "Ukjent"),
+                                        type: flytype,
+                                        reg: regNummer,
+                                        fra: flyinfo[11] || "???",
+                                        til: flyinfo[12] || "???",
+                                        høyde: altitude + " ft",
+                                        fart: flyinfo[5] + " kt",
+                                        retning: heading,
+                                        avstand: avstandKm
+                                    });
+                                }
+                            }
+
+                            if (flyListe.length === 0) {
+                                statusEl.innerText = "Ingen fly i lufta innenfor 30 km akkurat nå.";
+                                tabellEl.style.display = "none";
+                                return;
+                            }
+
+                            flyListe.sort(function (a, b) {
+                                return a.avstand - b.avstand;
+                            });
+                            
+                            var maksSyvFly = flyListe.slice(0, 7);
+
+                            statusEl.style.display = "none";
+                            tabellEl.style.display = "table";
+                            
+                            for (var i = 0; i < maksSyvFly.length; i++) {
+                                var fly = maksSyvFly[i];
+                                var rad = document.createElement("tr");
+                                var pil = hentRetningsPil(fly.retning);
+
+                                rad.innerHTML = "<td><strong>" + fly.rute + "</strong><br><small>" + fly.type + " (" + fly.reg + ")</small></td>" +
+                                                "<td>" + fly.fra + " -> " + fly.til + "</td>" +
+                                                "<td>" + fly.høyde + "<br>" + fly.fart + "</td>" +
+                                                "<td><span style='font-size:1.2rem; font-weight:bold;'>" + pil + "</span> " + fly.avstand.toFixed(1) + " km</td>";
+                                dataBoks.appendChild(rad);
+                            }
+
+                        } catch (e) {
+                            statusEl.innerText = "Feil ved tolking av data.";
+                            console.error(e);
+                        }
+                    } else {
+                        statusEl.innerText = "Kunne ikke kontakte server (Status: " + xhr.status + ")";
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function oppdaterAlleFlyplasser() {
+            var nå = new Date();
+            document.getElementById("time").innerText = nå.toLocaleTimeString("no-NO");
+            hentDataForFlyplass("osl");
+            hentDataForFlyplass("tos");
+        }
+
+        function nullstillOgHent() {
+            sekunderIgjen = oppdateringsFrekvensSekunder;
+            document.getElementById("teller").innerText = sekunderIgjen;
+            oppdaterAlleFlyplasser();
+        }
+
+        setInterval(function () {
+            sekunderIgjen--;
+            if (sekunderIgjen <= 0) {
+                sekunderIgjen = oppdateringsFrekvensSekunder;
+                oppdaterAlleFlyplasser();
+            }
+            document.getElementById("teller").innerText = sekunderIgjen;
+        }, 1000);
+
+        oppdaterAlleFlyplasser();
+    </script>
+</body>
+</html>
