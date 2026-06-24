@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kun Avinor Test</title>
+    <style>
+        body { font-family: monospace; background: #fff; color: #000; padding: 20px; }
+        h2 { border-bottom: 2px solid #000; padding-bottom: 5px; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border-bottom: 1px solid #000; padding: 8px; text-align: left; }
+        th { font-weight: bold; }
+        .status { font-style: italic; color: #666; }
+    </style>
+</head>
+<body>
+
+    <h1>AVINOR LANDINGSTEST</h1>
+    <p>Viser fly som har landet de siste 15 minuttene hentet direkte via AllOrigins.</p>
+
+    <h2>GARDERMOEN (OSL)</h2>
+    <div id="statusOsl" class="status">Venter på data...</div>
+    <table id="tabellOsl" style="display:none;">
+        <thead>
+            <tr>
+                <th>Flynummer</th>
+                <th>Kommer fra</th>
+                <th>Landet for</th>
+                <th>Gate</th>
+            </tr>
+        </thead>
+        <tbody id="dataOsl"></tbody>
+    </table>
+
+    <h2>TROMSØ (TOS)</h2>
+    <div id="statusTos" class="status">Venter på data...</div>
+    <table id="tabellTos" style="display:none;">
+        <thead>
+            <tr>
+                <th>Flynummer</th>
+                <th>Kommer fra</th>
+                <th>Landet for</th>
+                <th>Gate</th>
+            </tr>
+        </thead>
+        <tbody id="dataTos"></tbody>
+    </table>
+
+    <script>
+        function testAvinor(flyplassId, kode, url) {
+            var statusEl = document.getElementById("statusOsl" === "status" + flyplassId ? "statusOsl" : "status" + flyplassId.toUpperCase().charAt(0) + flyplassId.slice(1));
+            // Justering for ID-er basert på oppsettet over
+            if (flyplassId === "osl") {
+                statusEl = document.getElementById("statusOsl");
+            } else {
+                statusEl = document.getElementById("statusTos");
+            }
+            
+            statusEl.innerText = "Kobler til AllOrigins...";
+
+            var script = document.createElement('script');
+            var callbackNavn = 'test_callback_' + flyplassId + '_' + new Date().getTime();
+            
+            window[callbackNavn] = function(data) {
+                statusEl.innerText = "Data mottatt. Tolker XML...";
+                try {
+                    var parser = new DOMParser();
+                    var xmlDoc = parser.parseFromString(data.contents, "text/xml");
+                    
+                    // Sjekk om XML-en inneholder feil
+                    var parserError = xmlDoc.getElementsByTagName("parsererror");
+                    if (parserError.length > 0) {
+                        statusEl.innerText = "Feil: Klarte ikke å tolke XML-en fra proxyen.";
+                        return;
+                    }
+
+                    var flights = xmlDoc.getElementsByTagName("flight");
+                    var nåTid = new Date().getTime();
+                    var htmlInnhold = "";
+                    var antallLandet = 0;
+
+                    for (var i = 0; i < flights.length; i++) {
+                        var statusXml = flights[i].getElementsByTagName("status")[0];
+                        
+                        // Sjekk om status-koden er "A" (Arrived / Landet)
+                        if (statusXml && statusXml.getAttribute("code") === "A") {
+                            var actualTimeStr = flights[i].getElementsByTagName("actualTime")[0];
+                            
+                            if (actualTimeStr) {
+                                var landetTid = new Date(actualTimeStr.textContent || actualTimeStr.innerText).getTime();
+                                var diffMinutter = (nåTid - landetTid) / 1000 / 60;
+
+                                // Vis flyet hvis det landet for mellom 0 og 15 minutter siden
+                                if (diffMinutter >= 0 && diffMinutter <= 15) {
+                                    antallLandet++;
+                                    var rute = flights[i].getElementsByTagName("flight_id")[0]?.textContent || "Ukjent";
+                                    var fra = flights[i].getElementsByTagName("airport")[0]?.textContent || "???";
+                                    var gate = flights[i].getElementsByTagName("gate")[0]?.textContent || "-";
+                                    var tidTekst = Math.floor(diffMinutter) + "m " + Math.floor((diffMinutter % 1) * 60) + "s siden";
+
+                                    htmlInnhold += "<tr>" +
+                                                   "<td><strong>" + rute + "</strong></td>" +
+                                                   "<td>" + fra + "</td>" +
+                                                   "<td>" + tidTekst + "</td>" +
+                                                   "<td>" + gate + "</td>" +
+                                                   "</tr>";
+                                }
+                            }
+                        }
+                    }
+
+                    var tabellEl = (flyplassId === "osl") ? document.getElementById("tabellOsl") : document.getElementById("tabellTos");
+                    var dataEl = (flyplassId === "osl") ? document.getElementById("dataOsl") : document.getElementById("dataTos");
+
+                    if (antallLandet > 0) {
+                        dataEl.innerHTML = htmlInnhold;
+                        statusEl.style.display = "none";
+                        tabellEl.style.display = "table";
+                    } else {
+                        statusEl.innerText = "Ingen fly har landet de siste 15 minuttene.";
+                    }
+
+                } catch (e) {
+                    statusEl.innerText = "Krasj under tolking: " + e.message;
+                    console.error(e);
+                }
+
+                // Opprydding
+                delete window[callbackNavn];
+                script.parentNode.removeChild(script);
+            };
+
+            script.src = "https://api.allorigins.win/get?url=" + encodeURIComponent(url + "&_cb=" + new Date().getTime()) + "&callback=" + callbackNavn;
+            document.body.appendChild(script);
+        }
+
+        // Kjør testen med en gang siden laster
+        testAvinor("osl", "OSL", "https://data.avinor.no/flightdata/v1/airport/OSL/arrivals?TimeWindow=1");
+        testAvinor("tos", "TOS", "https://data.avinor.no/flightdata/v1/airport/TOS/arrivals?TimeWindow=1");
+    </script>
+</body>
+</html>
