@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Ankomster</title>
+    <style>
+        body { font-family: monospace, sans-serif; background-color: #ffffff; color: #000000; padding: 10px; margin: 0; }
+        h2 { margin-bottom: 5px; border-bottom: 2px solid #000000; padding-bottom: 5px; font-size: 1.2rem; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 5px; margin-bottom: 15px; }
+        th, td { border-bottom: 1px solid #000000; text-align: left; padding: 6px 4px; font-size: 0.9rem; }
+        th { font-weight: bold; }
+        .loading { font-style: italic; font-size: 0.9rem; margin-bottom: 15px; }
+        .status-top { color: #000000; font-weight: bold; }
+        .meta { font-size: 0.8rem; margin-top: 25px; border-top: 1px dashed #000000; padding-top: 10px; line-height: 1.4; }
+        button { background-color: #ffffff; color: #000000; border: 2px solid #000000; padding: 8px 15px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+    <button onclick="oppdaterAlle()">OPPDATER NÅ</button>
+
+    <h2>GARDERMOEN (OSL) - SISTE LANDINGER</h2>
+    <div id="statusOsl" class="loading">Henter data...</div>
+    <table id="tabellOsl" style="display:none;">
+        <thead>
+            <tr>
+                <th>Tid (UTC)</th>
+                <th>Fly (Callsign)</th>
+                <th>Avgangsflyplass</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="dataOsl"></tbody>
+    </table>
+
+    <h2>TROMSØ (TOS) - SISTE LANDINGER</h2>
+    <div id="statusTos" class="loading">Henter data...</div>
+    <table id="tabellTos" style="display:none;">
+        <thead>
+            <tr>
+                <th>Tid (UTC)</th>
+                <th>Fly (Callsign)</th>
+                <th>Avgangsflyplass</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="dataTos"></tbody>
+    </table>
+
+    <div class="meta">
+        Kilde: OpenSky Network (Åpen Live-feed)<br>
+        Sist oppdatert: <span id="time">-</span><br>
+        Neste automatiske sjekk om: <span id="teller">30</span>s
+    </div>
+
+    <script>
+        var tellerSekunder = 30;
+        var sekunderIgjen = tellerSekunder;
+
+        // ICAO-koder for rullebanene (Gardermoen = ENGM, Tromsø = ENTC)
+        var flyplasser = {
+            osl: { icao: "ENGM", navn: "OSL" },
+            tos: { icao: "ENTC", navn: "TOS" }
+        };
+
+        function hentOpenSkyData(flyplassId) {
+            var fp = flyplasser[flyplassId];
+            var statusEl = document.getElementById("status" + flyplassId.charAt(0).toUpperCase() + flyplassId.slice(1));
+            var tabellEl = document.getElementById("tabell" + flyplassId.charAt(0).toUpperCase() + flyplassId.slice(1));
+            var dataBoks = document.getElementById("data" + flyplassId.charAt(0).toUpperCase() + flyplassId.slice(1));
+
+            statusEl.style.display = "block";
+            statusEl.innerText = "Henter ferske landinger...";
+            tabellEl.style.display = "none";
+
+            var nå = Math.floor(Date.now() / 1000);
+            var toTimerSiden = nå - (2 * 60 * 60); // Sjekker de siste 2 timene med trafikk
+
+            // OpenSky fritt API for ankomster
+            var url = "https://corsproxy.io/?https://opensky-network.org/api/flights/arrival?airport=" + fp.icao + "&begin=" + toTimerSiden + "&end=" + nå;
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var flights = JSON.parse(xhr.responseText);
+                            var html = "";
+                            var antallVisninger = 0;
+
+                            if (Array.isArray(flights) && flights.length > 0) {
+                                // Sorter slik at de nyeste landingene kommer først
+                                flights.sort((a, b) => b.firstSeen - a.firstSeen);
+
+                                for (var i = 0; i < flights.length; i++) {
+                                    var f = flights[i];
+                                    
+                                    var landTid = new Date(f.lastSeen * 1000);
+                                    var tidsTekst = landTid.toLocaleTimeString("no-NO", {hour: '2-digit', minute:'2-digit'});
+                                    var callsign = f.callsign ? f.callsign.trim() : "Ukjent";
+                                    var fra = f.estDepartureAirport || "???";
+
+                                    antallVisninger++;
+
+                                    html += "<tr>" +
+                                            "<td><strong>Kl. " + tidsTekst + "</strong></td>" +
+                                            "<td>" + callsign + "</td>" +
+                                            "<td>" + fra + "</td>" +
+                                            "<td class='status-top'>✓ LANDET</td>" +
+                                            "</tr>";
+
+                                    if (antallVisninger >= 5) break;
+                                }
+                            }
+
+                            if (antallVisninger > 0) {
+                                dataBoks.innerHTML = html;
+                                statusEl.style.display = "none";
+                                tabellEl.style.display = "table";
+                            } else {
+                                statusEl.innerText = "Ingen registrerte landinger de siste timene.";
+                            }
+
+                        } catch (e) {
+                            statusEl.innerText = "Feil under lesing av flydata.";
+                        }
+                    } else {
+                        statusEl.innerText = "Henting feilet (Status: " + xhr.status + "). Prøver igjen straks...";
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function oppdaterAlle() {
+            document.getElementById("time").innerText = new Date().toLocaleTimeString("no-NO");
+            hentOpenSkyData("osl");
+            hentOpenSkyData("tos");
+        }
+
+        setInterval(function () {
+            sekunderIgjen--;
+            if (sekunderIgjen <= 0) {
+                sekunderIgjen = tellerSekunder;
+                oppdaterAlle();
+            }
+            document.getElementById("teller").innerText = sekunderIgjen;
+        }, 1000);
+
+        oppdaterAlle();
+    </script>
+</body>
+</html>
