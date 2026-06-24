@@ -25,10 +25,10 @@
     <table id="tabellOsl" style="display:none;">
         <thead>
             <tr>
+                <th>Tid</th>
                 <th>Flynummer</th>
                 <th>Kommer fra</th>
-                <th>Tidspunkt</th>
-                <th>Status</th>
+                <th>Status / Gate</th>
             </tr>
         </thead>
         <tbody id="dataOsl"></tbody>
@@ -39,17 +39,17 @@
     <table id="tabellTos" style="display:none;">
         <thead>
             <tr>
+                <th>Tid</th>
                 <th>Flynummer</th>
                 <th>Kommer fra</th>
-                <th>Tidspunkt</th>
-                <th>Status</th>
+                <th>Status / Gate</th>
             </tr>
         </thead>
         <tbody id="dataTos"></tbody>
     </table>
 
     <div class="meta">
-        Kilde: Åpen lufthavndatabase (Avinor-speil)<br>
+        Kilde: Avinor Teledata Live (Åpen kilde)<br>
         Sist oppdatert: <span id="time">-</span><br>
         Neste automatiske sjekk om: <span id="teller">30</span>s
     </div>
@@ -58,56 +58,60 @@
         var tellerSekunder = 30;
         var sekunderIgjen = tellerSekunder;
 
-        function hentFlyplassData(flyplassId, iataKode) {
+        function hentAvinorTekst(flyplassId, kode) {
             var statusEl = document.getElementById("status" + flyplassId.charAt(0).toUpperCase() + flyplassId.slice(1));
             var tabellEl = document.getElementById("tabell" + flyplassId.charAt(0).toUpperCase() + flyplassId.slice(1));
             var dataBoks = document.getElementById("data" + flyplassId.charAt(0).toUpperCase() + flyplassId.slice(1));
 
             statusEl.style.display = "block";
-            statusEl.innerText = "Henter ferske landinger...";
+            statusEl.innerText = "Henter offisielle flytider...";
             tabellEl.style.display = "none";
 
-            // Bruker et åpent API-speil som leverer stabile JSON-data for ankomster
-            var url = "https://corsproxy.io/?https://api.aviationstack.com/v1/flights?access_key=7ca6ccb9b940984ee1b827ea80f68c34&arr_iata=" + iataKode;
+            // Vi henter Avinor sin offisielle og helt åpne tekst-feed via corsproxy.io
+            var url = "https://corsproxy.io/?https://flydata.avinor.no/Teledata?lufthavn=" + kode + "&retning=A";
 
             var xhr = new XMLHttpRequest();
-            xhr.open("GET", url, true);
+            xhr.open("GET", url + "&_cb=" + new Date().getTime(), true);
             
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
                         try {
-                            var respons = JSON.parse(xhr.responseText);
+                            var tekstData = xhr.responseText;
+                            var linjer = tekstData.split("\n");
                             var html = "";
                             var antallVisninger = 0;
 
-                            if (respons && respons.data) {
-                                // Gå igjennom de tilgjengelige flyene i feeden
-                                for (var i = 0; i < respons.data.length; i++) {
-                                    var f = respons.data[i];
-                                    
-                                    // Vi vil kun vise fly som har status "landed" (eller har ankommet)
-                                    if (f.flight_status === "landed" || f.arrival.actual) {
+                            // Loop igjennom tekstlinjene (vi hopper over den første overskriftslinjen)
+                            for (var i = 1; i < linjer.length; i++) {
+                                var linje = linjer[i].trim();
+                                if (linje === "") continue;
+
+                                // Avinor deler dataene med semikolon (;). Superenkelt å splitte!
+                                var felt = linje.split(";");
+                                
+                                if (felt.length >= 7) {
+                                    var planlagtTid = felt[0] ? felt[0].substring(11, 16) : "--:--";
+                                    var flynummer = felt[1] || "Ukjent";
+                                    var fra Flyplass = felt[2] || "???";
+                                    var statusTekst = felt[5] || "";
+                                    var gate = felt[6] || "";
+
+                                    // Vi vil gjerne vise fly som enten har landet ("Landed" / "Ankommet") eller er like rundt hjørnet
+                                    if (statusTekst.toLowerCase().indexOf("land") !== -1 || statusText.toLowerCase().indexOf("ank") !== -1 || statusTekst === "") {
                                         antallVisninger++;
                                         
-                                        var flynummer = f.flight?.iata || f.flight?.icao || "Ukjent";
-                                        var fra = f.departure?.airport || f.departure?.iata || "Ukjent";
-                                        
-                                        // Hent faktisk landingstid eller planlagt tid
-                                        var landTid = f.arrival.actual ? new Date(f.arrival.actual) : new Date(f.arrival.scheduled);
-                                        var tidsTekst = landTid.toLocaleTimeString("no-NO", {hour: '2-digit', minute:'2-digit'});
-                                        
-                                        var gate = f.arrival.gate ? "Gate " + f.arrival.gate : "✓ Landet";
+                                        var statusVisning = gate !== "" ? "Gate " + gate : (statusTekst || "✓ Landet");
 
                                         html += "<tr>" +
-                                                "<td><strong>" + flynummer + "</strong><br><small>" + (f.airline?.name || "Rute") + "</small></td>" +
-                                                "<td>" + fra + "</td>" +
-                                                "<td>Kl. " + tidsTekst + "</td>" +
-                                                "<td class='status-top'>" + gate + "</td>" +
+                                                "<td><strong>Kl. " + planlagtTid + "</strong></td>" +
+                                                "<td>" + flynummer + "</td>" +
+                                                "<td>" + fraFlyplass + "</td>" +
+                                                "<td class='status-top'>" + statusVisning + "</td>" +
                                                 "</tr>";
                                                 
-                                        // Begrens til de 5 siste landingene for å holde det ryddig
-                                        if (antallVisninger >= 5) break;
+                                        // Vis de 6 nyeste/neste flyene
+                                        if (antallVisninger >= 6) break;
                                     }
                                 }
                             }
@@ -117,14 +121,14 @@
                                 statusEl.style.display = "none";
                                 tabellEl.style.display = "table";
                             } else {
-                                statusEl.innerText = "Ingen nylige landinger registrert akkurat nå.";
+                                statusEl.innerText = "Ingen nylige ankomster registrert i Avinor-feeden.";
                             }
 
                         } catch (e) {
-                            statusEl.innerText = "Feil ved tolking av mottatt data.";
+                            statusEl.innerText = "Feil under lesing av tekstfeed.";
                         }
                     } else {
-                        statusEl.innerText = "Tjenesten er utilgjengelig (Status: " + xhr.status + ")";
+                        statusEl.innerText = "Avinor-feeden er midlertidig utilgjengelig (Status: " + xhr.status + ")";
                     }
                 }
             };
@@ -133,8 +137,8 @@
 
         function oppdaterAlle() {
             document.getElementById("time").innerText = new Date().toLocaleTimeString("no-NO");
-            hentFlyplassData("osl", "OSL");
-            hentFlyplassData("tos", "TOS");
+            hentAvinorTekst("osl", "OSL");
+            hentAvinorTekst("tos", "TOS");
         }
 
         setInterval(function () {
