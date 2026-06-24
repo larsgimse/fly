@@ -67,7 +67,6 @@
             statusEl.innerText = "Henter offisielle flytider...";
             tabellEl.style.display = "none";
 
-            // Vi henter Avinor sin offisielle og helt åpne tekst-feed via corsproxy.io
             var url = "https://corsproxy.io/?https://flydata.avinor.no/Teledata?lufthavn=" + kode + "&retning=A";
 
             var xhr = new XMLHttpRequest();
@@ -82,23 +81,21 @@
                             var html = "";
                             var antallVisninger = 0;
 
-                            // Loop igjennom tekstlinjene (vi hopper over den første overskriftslinjen)
                             for (var i = 1; i < linjer.length; i++) {
                                 var linje = linjer[i].trim();
                                 if (linje === "") continue;
 
-                                // Avinor deler dataene med semikolon (;). Superenkelt å splitte!
                                 var felt = linje.split(";");
                                 
                                 if (felt.length >= 7) {
                                     var planlagtTid = felt[0] ? felt[0].substring(11, 16) : "--:--";
                                     var flynummer = felt[1] || "Ukjent";
-                                    var fra Flyplass = felt[2] || "???";
+                                    var fraFlyplass = felt[2] || "???";
                                     var statusTekst = felt[5] || "";
                                     var gate = felt[6] || "";
 
-                                    // Vi vil gjerne vise fly som enten har landet ("Landed" / "Ankommet") eller er like rundt hjørnet
-                                    if (statusTekst.toLowerCase().indexOf("land") !== -1 || statusText.toLowerCase().indexOf("ank") !== -1 || statusTekst === "") {
+                                    // Her er feilen rettet (statusTekst i steden for statusText)
+                                    if (statusTekst.toLowerCase().indexOf("land") !== -1 || statusTekst.toLowerCase().indexOf("ank") !== -1 || statusTekst === "") {
                                         antallVisninger++;
                                         
                                         var statusVisning = gate !== "" ? "Gate " + gate : (statusTekst || "✓ Landet");
@@ -110,7 +107,6 @@
                                                 "<td class='status-top'>" + statusVisning + "</td>" +
                                                 "</tr>";
                                                 
-                                        // Vis de 6 nyeste/neste flyene
                                         if (antallVisninger >= 6) break;
                                     }
                                 }
