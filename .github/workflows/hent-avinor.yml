@@ -1,0 +1,25 @@
+name: Hent ferske Avinor-data
+
+on:
+  schedule:
+    - cron: '*/5 * * * *' # Kjører automatisk hvert 5. minutt
+  workflow_dispatch: # Gjør at du kan starte den manuelt med en knapp
+
+jobs:
+  oppdater-data:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Sjekk ut kildekoden
+      uses: actions/checkout@v3
+
+    - name: Hent data fra Avinor for OSL og TOS
+      run: |
+        curl -s "https://data.avinor.no/flightdata/v1/airport/OSL/arrivals?TimeWindow=1" -o osl.xml
+        curl -s "https://data.avinor.no/flightdata/v1/airport/TOS/arrivals?TimeWindow=1" -o tos.xml
+
+    - name: Lagre filene og dytt til GitHub Pages
+      run: |
+        git config --global user.name 'Avinor Bot'
+        git config --global user.email 'bot@github.com'
+        git add osl.xml tos.xml
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Oppdaterte flydata fra Avinor" && git push)
