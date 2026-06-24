@@ -81,6 +81,7 @@
                             var html = "";
                             var antallVisninger = 0;
 
+                            // Loop igjennom linjene (hopper over overskriften på linje 0)
                             for (var i = 1; i < linjer.length; i++) {
                                 var linje = linjer[i].trim();
                                 if (linje === "") continue;
@@ -94,21 +95,27 @@
                                     var statusTekst = felt[5] || "";
                                     var gate = felt[6] || "";
 
-                                    // Her er feilen rettet (statusTekst i steden for statusText)
-                                    if (statusTekst.toLowerCase().indexOf("land") !== -1 || statusTekst.toLowerCase().indexOf("ank") !== -1 || statusTekst === "") {
-                                        antallVisninger++;
-                                        
-                                        var statusVisning = gate !== "" ? "Gate " + gate : (statusTekst || "✓ Landet");
-
-                                        html += "<tr>" +
-                                                "<td><strong>Kl. " + planlagtTid + "</strong></td>" +
-                                                "<td>" + flynummer + "</td>" +
-                                                "<td>" + fraFlyplass + "</td>" +
-                                                "<td class='status-top'>" + statusVisning + "</td>" +
-                                                "</tr>";
-                                                
-                                        if (antallVisninger >= 6) break;
+                                    // Åpnet filteret: Vi viser flyet uansett status for å fylle tabellen
+                                    antallVisninger++;
+                                    
+                                    // Hvis flyet har en gate, vis gatenummeret. Hvis ikke, vis statusen (f.eks Landet, Ny tid, eller blank)
+                                    var statusVisning = "✓ OK";
+                                    if (statusTekst !== "") {
+                                        statusVisning = statusTekst;
                                     }
+                                    if (gate !== "") {
+                                        statusVisning = "Gate " + gate;
+                                    }
+
+                                    html += "<tr>" +
+                                            "<td><strong>Kl. " + planlagtTid + "</strong></td>" +
+                                            "<td>" + flynummer + "</td>" +
+                                            "<td>" + fraFlyplass + "</td>" +
+                                            "<td class='status-top'>" + statusVisning + "</td>" +
+                                            "</tr>";
+                                            
+                                    // Viser de 8 øverste/siste flyene i lista fra Avinor
+                                    if (antallVisninger >= 8) break;
                                 }
                             }
 
@@ -117,14 +124,14 @@
                                 statusEl.style.display = "none";
                                 tabellEl.style.display = "table";
                             } else {
-                                statusEl.innerText = "Ingen nylige ankomster registrert i Avinor-feeden.";
+                                statusEl.innerText = "Ingen data tilgjengelig i Avinor-feeden akkurat nå.";
                             }
 
                         } catch (e) {
-                            statusEl.innerText = "Feil under lesing av tekstfeed.";
+                            statusEl.innerText = "Feil under lesing av datastrøm.";
                         }
                     } else {
-                        statusEl.innerText = "Avinor-feeden er midlertidig utilgjengelig (Status: " + xhr.status + ")";
+                        statusEl.innerText = "Avinor-feeden svarte ikke (Status: " + xhr.status + ")";
                     }
                 }
             };
