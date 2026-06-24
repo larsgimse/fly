@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flyradar (GitHub Pages Stabil)</title>
+    <title>Flyradar (Flettet GitHub-versjon)</title>
     <style>
         body {
             font-family: monospace, sans-serif;
@@ -18,12 +18,6 @@
             padding-bottom: 5px;
             font-size: 1.2rem;
             margin-top: 15px;
-        }
-        h3 {
-            font-size: 0.9rem;
-            margin: 5px 0;
-            text-transform: uppercase;
-            letter-spacing: 1px;
         }
         .meta {
             font-size: 0.8rem;
@@ -64,76 +58,42 @@
             font-size: 0.9rem;
             margin-bottom: 15px;
         }
+        .status-landet {
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
     <button onclick="nullstillOgHent()">OPPDATER NÅ</button>
 
-    <h2>GARDERMOEN</h2>
+    <h2>GARDERMOEN (OSL)</h2>
     <div id="statusOsl" class="loading">Henter ferske data...</div>
-    
-    <div id="seksjonIluftaOsl" style="display:none;">
-        <h3>I lufta (Maks 5)</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Fly / Rute</th>
-                    <th>Fra -> Til</th>
-                    <th>Høyde/Fart</th>
-                    <th>Retn. / Avstand</th>
-                </tr>
-            </thead>
-            <tbody id="dataOsl"></tbody>
-        </table>
-    </div>
+    <table id="tabellOsl" style="display:none;">
+        <thead>
+            <tr>
+                <th>Fly / Rute</th>
+                <th>Fra -> Til</th>
+                <th>Status / Info</th>
+                <th>Detaljer</th>
+            </tr>
+        </thead>
+        <tbody id="dataOsl"></tbody>
+    </table>
 
-    <div id="seksjonLandetOsl" style="display:none;">
-        <h3>Nylig landet (Siste 15 min)</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Fly / Rute</th>
-                    <th>Fra -> Til</th>
-                    <th>Tid / Gate</th>
-                </tr>
-            </thead>
-            <tbody id="dataLandetOsl"></tbody>
-        </table>
-    </div>
-
-
-    <h2>TROMSØ</h2>
+    <h2>TROMSØ (TOS)</h2>
     <div id="statusTos" class="loading">Henter ferske data...</div>
-    
-    <div id="seksjonIluftaTos" style="display:none;">
-        <h3>I lufta (Maks 5)</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Fly / Rute</th>
-                    <th>Fra -> Til</th>
-                    <th>Høyde/Fart</th>
-                    <th>Retn. / Avstand</th>
-                </tr>
-            </thead>
-            <tbody id="dataTos"></tbody>
-        </table>
-    </div>
-
-    <div id="seksjonLandetTos" style="display:none;">
-        <h3>Nylig landet (Siste 15 min)</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Fly / Rute</th>
-                    <th>Fra -> Til</th>
-                    <th>Tid / Gate</th>
-                </tr>
-            </thead>
-            <tbody id="dataLandetTos"></tbody>
-        </table>
-    </div>
+    <table id="tabellTos" style="display:none;">
+        <thead>
+            <tr>
+                <th>Fly / Rute</th>
+                <th>Fra -> Til</th>
+                <th>Status / Info</th>
+                <th>Detaljer</th>
+            </tr>
+        </thead>
+        <tbody id="dataTos"></tbody>
+    </table>
 
     <div class="meta">
         Sist oppdatert: <span id="time">-</span><br>
@@ -149,10 +109,12 @@
                 url: "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.480,59.910,10.510,11.680%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=0%26air=1%26vehicles=0%26estimated=1",
                 avinorRawUrl: "https://data.avinor.no/flightdata/v1/airport/OSL/arrivals?TimeWindow=1",
                 statusElId: "statusOsl",
-                seksjonIluftaId: "seksjonIluftaOsl",
-                seksjonLandetId: "seksjonLandetOsl",
+                tabellId: "tabellOsl",
                 dataElId: "dataOsl",
-                dataLandetElId: "dataLandetOsl"
+                flyIlufta: [],
+                flyLandet: [],
+                frFerdig: false,
+                avinorFerdig: false
             },
             tos: {
                 kode: "TOS",
@@ -161,10 +123,12 @@
                 url: "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=69.960,69.400,18.150,19.680%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=0%26air=1%26vehicles=0%26estimated=1",
                 avinorRawUrl: "https://data.avinor.no/flightdata/v1/airport/TOS/arrivals?TimeWindow=1",
                 statusElId: "statusTos",
-                seksjonIluftaId: "seksjonIluftaTos",
-                seksjonLandetId: "seksjonLandetTos",
+                tabellId: "tabellTos",
                 dataElId: "dataTos",
-                dataLandetElId: "dataLandetTos"
+                flyIlufta: [],
+                flyLandet: [],
+                frFerdig: false,
+                avinorFerdig: false
             }
         };
                 
@@ -193,25 +157,73 @@
 
         function hentDataForFlyplass(id) {
             var fp = flyplasser[id];
+            fp.flyIlufta = [];
+            fp.flyLandet = [];
+            fp.frFerdig = false;
+            fp.avinorFerdig = false;
+
             document.getElementById(fp.statusElId).style.display = "block";
             document.getElementById(fp.statusElId).innerText = "Henter ferske data...";
-            document.getElementById(fp.seksjonIluftaId).style.display = "none";
-            document.getElementById(fp.seksjonLandetId).style.display = "none";
+            document.getElementById(fp.tabellId).style.display = "none";
             document.getElementById(fp.dataElId).innerHTML = "";
-            document.getElementById(fp.dataLandetElId).innerHTML = "";
 
             hentFlightradarData(id);
             hentAvinorData(id);
         }
 
+        function sjekkOmFerdigOgBygg(id) {
+            var fp = flyplasser[id];
+            if (!fp.frFerdig || !fp.avinorFerdig) return; // Vent til begge kilder har svart
+
+            var dataBoks = document.getElementById(fp.dataElId);
+            var tabellEl = document.getElementById(fp.tabellId);
+            var statusEl = document.getElementById(fp.statusElId);
+
+            var htmlInnhold = "";
+
+            // 1. Legg til fly i lufta (Maks 5, sortert etter avstand)
+            if (fp.flyIlufta.length > 0) {
+                fp.flyIlufta.sort(function (a, b) { return a.avstand - b.avstand; });
+                var maksFemLufta = fp.flyIlufta.slice(0, 5);
+                
+                for (var i = 0; i < maksFemLufta.length; i++) {
+                    var f = maksFemLufta[i];
+                    var pil = hentRetningsPil(f.retning);
+                    htmlInnhold += "<tr>" +
+                                   "<td><strong>" + f.rute + "</strong><br><small>" + f.type + "</small></td>" +
+                                   "<td>" + f.fra + " -> " + f.til + "</td>" +
+                                   "<td>I LUFTA<br><small>" + f.høyde + " / " + f.fart + "</small></td>" +
+                                   "<td><span style='font-size:1.1rem; font-weight:bold;'>" + pil + "</span> " + f.avstand.toFixed(1) + " km</td>" +
+                                   "</tr>";
+                }
+            }
+
+            // 2. Legg til nylig landede fly fra Avinor (Landet siste 15 min)
+            if (fp.flyLandet.length > 0) {
+                for (var j = 0; j < fp.flyLandet.length; j++) {
+                    var l = fp.flyLandet[j];
+                    htmlInnhold += "<tr>" +
+                                   "<td><strong>" + l.rute + "</strong><br><small>✓ LANDET</small></td>" +
+                                   "<td>" + l.fra + " -> " + fp.kode + "</td>" +
+                                   "<td class='status-landet'>" + l.tidTekst + "</td>" +
+                                   "<td><strong>Gate: " + l.gate + "</strong></td>" +
+                                   "</tr>";
+                }
+            }
+
+            if (htmlInnhold !== "") {
+                dataBoks.innerHTML = htmlInnhold;
+                statusEl.style.display = "none";
+                tabellEl.style.display = "table";
+            } else {
+                statusEl.innerText = "Ingen aktive eller nylig landede fly funnet.";
+            }
+        }
+
         function hentAvinorData(id) {
             var fp = flyplasser[id];
-            var dataLandetBoks = document.getElementById(fp.dataLandetElId);
-            var seksjonLandet = document.getElementById(fp.seksjonLandetId);
-
-            // Vi bruker AllOrigins proxy med JSONP for å tvinge igjennom store data uten CORS-sperre
             var script = document.createElement('script');
-            var callbackNavn = 'callback_avinor_' + id + '_' + new Date().getTime();
+            var callbackNavn = 'callback_avinor_' + id + '_' + new Date().getTime() + Math.floor(Math.random() * 1000);
             
             window[callbackNavn] = function(data) {
                 try {
@@ -219,7 +231,6 @@
                     var xmlDoc = parser.parseFromString(data.contents, "text/xml");
                     var flights = xmlDoc.getElementsByTagName("flight");
                     var nåTid = new Date().getTime();
-                    var htmlInnhold = "";
 
                     for (var i = 0; i < flights.length; i++) {
                         var statusElXml = flights[i].getElementsByTagName("status")[0];
@@ -235,29 +246,23 @@
                                     var airportEl = flights[i].getElementsByTagName("airport")[0];
                                     var gateEl = flights[i].getElementsByTagName("gate")[0];
 
-                                    var rute = fId ? (fId.textContent || fId.innerText) : "Ukjent";
-                                    var fra = airportEl ? (airportEl.textContent || airportEl.innerText) : "???";
-                                    var gate = gateEl ? (gateEl.textContent || gateEl.innerText) : "-";
-                                    var tidTekst = Math.floor(tidsDiffMinutter) + "m " + Math.floor((tidsDiffMinutter % 1) * 60) + "s siden";
-
-                                    htmlInnhold += "<tr><td><strong>" + rute + "</strong><br><small>✓ LANDET</small></td>" +
-                                                   "<td>" + fra + " -> " + fp.kode + "</td>" +
-                                                   "<td>" + tidTekst + "<br><strong>Gate: " + gate + "</strong></td></tr>";
+                                    fp.flyLandet.push({
+                                        rute: fId ? (fId.textContent || fId.innerText) : "Ukjent",
+                                        fra: airportEl ? (airportEl.textContent || airportEl.innerText) : "???",
+                                        gate: gateEl ? (gateEl.textContent || gateEl.innerText) : "-",
+                                        tidTekst: Math.floor(tidsDiffMinutter) + "m siden"
+                                    });
                                 }
                             }
                         }
-                    }
-
-                    if (htmlInnhold !== "") {
-                        dataLandetBoks.innerHTML = htmlInnhold;
-                        seksjonLandet.style.display = "block";
-                        document.getElementById(fp.statusElId).style.display = "none";
                     }
                 } catch(e) {
                     console.error("Feil ved tolking av Avinor-XML: ", e);
                 }
                 
-                // Rydd opp global funksjon og script-tag etter bruk
+                fp.avinorFerdig = true;
+                sjekkOmFerdigOgBygg(id);
+                
                 delete window[callbackNavn];
                 script.parentNode.removeChild(script);
             };
@@ -268,65 +273,44 @@
 
         function hentFlightradarData(id) {
             var fp = flyplasser[id];
-            var statusEl = document.getElementById(fp.statusElId);
-            var seksjonIlufta = document.getElementById(fp.seksjonIluftaId);
-            var dataBoks = document.getElementById(fp.dataElId);
-
             var xhr = new XMLHttpRequest();
             xhr.open("GET", fp.url + "%26_=" + new Date().getTime(), true);
             
             xhr.onreadystatechange = function () {
-                if (xhr.readyState === 4 && xhr.status === 200) {
-                    try {
-                        var data = JSON.parse(xhr.responseText);
-                        var flyIluftaListe = [];
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var data = JSON.parse(xhr.responseText);
 
-                        for (var nøkkel in data) {
-                            if (data.hasOwnProperty(nøkkel) && nøkkel !== "full_count" && nøkkel !== "version" && nøkkel !== "stats") {
-                                var flyinfo = data[nøkkel];
-                                var altitude = flyinfo[4];
-                                var påBakken = flyinfo[14] === 1;
+                            for (var nøkkel in data) {
+                                if (data.hasOwnProperty(nøkkel) && nøkkel !== "full_count" && nøkkel !== "version" && nøkkel !== "stats") {
+                                    var flyinfo = data[nøkkel];
+                                    var altitude = flyinfo[4];
+                                    var påBakken = flyinfo[14] === 1;
 
-                                if (altitude <= 0 || påBakken) continue; 
-                                    
-                                var avstandKm = kalkulerAvstand(fp.lat, fp.lon, flyinfo[1], flyinfo[2]);
-                                if (avstandKm > 30.0) continue;
+                                    if (altitude <= 0 || påBakken) continue; 
+                                        
+                                    var avstandKm = kalkulerAvstand(fp.lat, fp.lon, flyinfo[1], flyinfo[2]);
+                                    if (avstandKm > 30.0) continue;
 
-                                flyIluftaListe.push({
-                                    rute: flyinfo[13] && flyinfo[13] !== "" ? flyinfo[13] : (flyinfo[16] ? flyinfo[16] : "Ukjent"),
-                                    type: flyinfo[8] || "Ukjent",
-                                    reg: flyinfo[9] || "Mangler reg.",
-                                    fra: flyinfo[11] || "???",
-                                    til: flyinfo[12] || "???",
-                                    høyde: altitude + " ft",
-                                    fart: flyinfo[5] + " kt",
-                                    retning: flyinfo[3],
-                                    avstand: avstandKm
-                                });
+                                    fp.flyIlufta.push({
+                                        rute: flyinfo[13] && flyinfo[13] !== "" ? flyinfo[13] : (flyinfo[16] ? flyinfo[16] : "Ukjent"),
+                                        type: flyinfo[8] || "Ukjent",
+                                        fra: flyinfo[11] || "???",
+                                        til: flyinfo[12] || "???",
+                                        høyde: altitude + " ft",
+                                        fart: flyinfo[5] + " kt",
+                                        retning: flyinfo[3],
+                                        avstand: avstandKm
+                                    });
+                                }
                             }
+                        } catch (e) {
+                            console.error(e);
                         }
-
-                        if (flyIluftaListe.length > 0) {
-                            flyIluftaListe.sort(function (a, b) { return a.avstand - b.avstand; });
-                            var maksFemFly = flyIluftaListe.slice(0, 5);
-                            var htmlInnhold = "";
-                            
-                            for (var i = 0; i < maksFemFly.length; i++) {
-                                var fly = maksFemFly[i];
-                                var pil = hentRetningsPil(fly.retning);
-                                htmlInnhold += "<tr><td><strong>" + fly.rute + "</strong><br><small>" + fly.type + " (" + fly.reg + ")</small></td>" +
-                                               "<td>" + fly.fra + " -> " + fly.til + "</td>" +
-                                               "<td>" + fly.høyde + "<br>" + fly.fart + "</td>" +
-                                               "<td><span style='font-size:1.2rem; font-weight:bold;'> " + pil + "</span> " + fly.avstand.toFixed(1) + " km</td></tr>";
-                            }
-                            dataBoks.innerHTML = htmlInnhold;
-                            seksjonIlufta.style.display = "block";
-                            statusEl.style.display = "none";
-                        }
-
-                    } catch (e) {
-                        console.error(e);
                     }
+                    fp.frFerdig = true;
+                    sjekkOmFerdigOgBygg(id);
                 }
             };
             xhr.send();
