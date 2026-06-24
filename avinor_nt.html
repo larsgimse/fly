@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avinor Live Ankomster</title>
+    <style>
+        body { font-family: monospace, sans-serif; background-color: #ffffff; color: #000000; padding: 10px; margin: 0; }
+        h2 { margin-bottom: 5px; border-bottom: 2px solid #000000; padding-bottom: 5px; font-size: 1.2rem; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 5px; margin-bottom: 15px; }
+        th, td { border-bottom: 1px solid #000000; text-align: left; padding: 6px 4px; font-size: 0.9rem; }
+        th { font-weight: bold; }
+        .loading { font-style: italic; font-size: 0.9rem; margin-bottom: 15px; }
+        .status-landet { font-weight: bold; }
+        .meta { font-size: 0.8rem; margin-top: 25px; border-top: 1px dashed #000000; padding-top: 10px; line-height: 1.4; }
+        button { background-color: #ffffff; color: #000000; border: 2px solid #000000; padding: 8px 15px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+    <button onclick="oppdaterAlle()">OPPDATER NÅ</button>
+
+    <h2>GARDERMOEN (OSL) - NYLIG LANDET</h2>
+    <div id="statusOsl" class="loading">Henter data fra Avinor...</div>
+    <table id="tabellOsl" style="display:none;">
+        <thead>
+            <tr>
+                <th>Fly / Rute</th>
+                <th>Kommer fra</th>
+                <th>Status / Tid</th>
+                <th>Gate</th>
+            </tr>
+        </thead>
+        <tbody id="dataOsl"></tbody>
+    </table>
+
+    <h2>TROMSØ (TOS) - NYLIG LANDET</h2>
+    <div id="statusTos" class="loading">Henter data fra Avinor...</div>
+    <table id="tabellTos" style="display:none;">
+        <thead>
+            <tr>
+                <th>Fly / Rute</th>
+                <th>Kommer fra</th>
+                <th>Status / Tid</th>
+                <th>Gate</th>
+            </tr>
+        </thead>
+        <tbody id="dataTos"></tbody>
+    </table>
+
+    <div class="meta">
+        Kilde: Avinor AS live JSON-feed<br>
+        Sist oppdatert: <span id="time">-</span><br>
+        Neste automatiske sjekk om: <span id="teller">30</span>s
+    </div>
+
+    <script>
+        var tellerSekunder = 30;
+        var sekunderIgjen = tellerSekunder;
+
+        function hentAvinorLive(flyplassId, kode) {
+            var statusEl = document.getElementById("status" + flyplassId.charAt(0).toUpperCase() + flyplassId.slice(1));
+            var tabellEl = document.getElementById("tabell" + flyplassId.charAt(0).toUpperCase() + flyplassId.slice(1));
+            var dataBoks = document.getElementById("data" + flyplassId.charAt(0).toUpperCase() + flyplassId.slice(1));
+
+            statusEl.style.display = "block";
+            statusEl.innerText = "Kobler til Avinor...";
+            tabellEl.style.display = "none";
+
+            // Vi bruker Avinor sitt offisielle JSON-API via corsproxy.io
+            var avinorUrl = "https://corsproxy.io/?https://flydata.avinor.no/Ankomst" + kode + ".json";
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", avinorUrl + "?_cb=" + new Date().getTime(), true);
+            
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var data = JSON.parse(xhr.responseText);
+                            var html = "";
+                            var antallFunnet = 0;
+                            var nåTid = new Date().getTime();
+
+                            if (data && data.flights) {
+                                for (var i = 0; i < data.flights.length; i++) {
+                                    var f = data.flights[i];
+                                    
+                                    // Sjekker etter status "A" (Arrived / Landet)
+                                    if (f.status && f.status.code === "A" && f.actualTime) {
+                                        var landetTidspunkt = new Date(f.actualTime).getTime();
+                                        var tidsDiffMinutter = (nåTid - landetTidspunkt) / 1000 / 60;
+
+                                        // Viser fly som har landet de siste 20 minuttene
+                                        if (tidsDiffMinutter >= 0 && tidsDiffMinutter <= 20) {
+                                            antallFunnet++;
+                                            var rute = f.flight_id || "Ukjent";
+                                            var fra = f.airport || "???";
+                                            var gate = f.gate || "-";
+                                            var minutterSiden = Math.floor(tidsDiffMinutter);
+                                            
+                                            var tidsTekst = minutterSiden === 0 ? "Nettopp landet" : minutterSiden + "m siden";
+
+                                            html += "<tr>" +
+                                                    "<td><strong>" + rute + "</strong><br><small>Avinor Live</small></td>" +
+                                                    "<td>" + fra + " -> " + kode + "</td>" +
+                                                    "<td class='status-landet'>✓ LANDET<br><small>" + tidsTekst + "</small></td>" +
+                                                    "<td><strong>" + gate + "</strong></td>" +
+                                                    "</tr>";
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (antallFunnet > 0) {
+                                dataBoks.innerHTML = html;
+                                statusEl.style.display = "none";
+                                tabellEl.style.display = "table";
+                            } else {
+                                statusEl.innerText = "Ingen fly har landet de siste 20 minuttene.";
+                            }
+
+                        } catch (e) {
+                            statusEl.innerText = "Feil ved lesing av Avinor-data.";
+                            console.error(e);
+                        }
+                    } else {
+                        statusEl.innerText = "Klarte ikke hente data (Status: " + xhr.status + ")";
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function oppdaterAlle() {
+            document.getElementById("time").innerText = new Date().toLocaleTimeString("no-NO");
+            hentAvinorLive("osl", "OSL");
+            hentAvinorLive("tos", "TOS");
+        }
+
+        setInterval(function () {
+            sekunderIgjen--;
+            if (sekunderIgjen <= 0) {
+                sekunderIgjen = tellerSekunder;
+                oppdaterAlle();
+            }
+            document.getElementById("teller").innerText = sekunderIgjen;
+        }, 1000);
+
+        oppdaterAlle();
+    </script>
+</body>
+</html>
