@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flyradar & Landinger</title>
+    <style>
+        body { font-family: monospace, sans-serif; background-color: #ffffff; color: #000000; padding: 10px; margin: 0; }
+        h2 { margin-bottom: 5px; border-bottom: 2px solid #000000; padding-bottom: 5px; font-size: 1.2rem; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 5px; margin-bottom: 15px; }
+        th, td { border-bottom: 1px solid #000000; text-align: left; padding: 6px 4px; font-size: 0.9rem; }
+        th { font-weight: bold; }
+        .loading { font-style: italic; font-size: 0.9rem; margin-bottom: 15px; }
+        .status-landet { color: #555; font-weight: bold; }
+        .meta { font-size: 0.8rem; margin-top: 25px; border-top: 1px dashed #000000; padding-top: 10px; line-height: 1.4; }
+        button { background-color: #ffffff; color: #000000; border: 2px solid #000000; padding: 8px 15px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+    <button onclick="oppdaterAlle()">OPPDATER NÅ</button>
+
+    <h2>GARDERMOEN (OSL)</h2>
+    <div id="statusOsl" class="loading">Henter ferske data...</div>
+    <table id="tabellOsl" style="display:none;">
+        <thead>
+            <tr>
+                <th>Fly / Rute</th>
+                <th>Fra -> Til</th>
+                <th>Status / Høyde</th>
+                <th>Avstand / Detalj</th>
+            </tr>
+        </thead>
+        <tbody id="dataOsl"></tbody>
+    </table>
+
+    <h2>TROMSØ (TOS)</h2>
+    <div id="statusTos" class="loading">Henter ferske data...</div>
+    <table id="tabellTos" style="display:none;">
+        <thead>
+            <tr>
+                <th>Fly / Rute</th>
+                <th>Fra -> Til</th>
+                <th>Status / Høyde</th>
+                <th>Avstand / Detalj</th>
+            </tr>
+        </thead>
+        <tbody id="dataTos"></tbody>
+    </table>
+
+    <div class="meta">
+        Sist oppdatert: <span id="time">-</span><br>
+        Automatisk oppdatering om: <span id="teller">30</span>s
+    </div>
+
+    <script>
+        var flyplasser = {
+            osl: { kode: "OSL", lat: 60.197, lon: 11.096, url: "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.480,59.910,10.510,11.680%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1" },
+            tos: { kode: "TOS", lat: 69.683, lon: 18.919, url: "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=69.960,69.400,18.150,19.680%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1" }
+        };
+
+        var tellerSekunder = 30;
+        var sekunderIgjen = tellerSekunder;
+
+        function kalkulerAvstand(lat1, lon1, lat2, lon2) {
+            var x = (lon2 - lon1) * Math.cos((lat1 + lat2) / 2 * Math.PI / 180) * 111.32;
+            var y = (lat2 - lat1) * 111.13;
+            return Math.sqrt(x * x + y * y);
+        }
+
+        function hentRetningsPil(grader) {
+            if (grader === undefined || grader === null) return "?";
+            var g = grader % 360;
+            if (g >= 337.5 || g < 22.5)  return "&#8593;";
+            if (g >= 22.5  && g < 67.5)  return "&#8599;";
+            if (g >= 67.5  && g < 112.5) return "&#8594;";
+            if (g >= 112.5 && g < 157.5) return "&#8600;";
+            if (g >= 157.5 && g < 202.5) return "&#8595;";
+            if (g >= 202.5 && g < 247.5) return "&#8601;";
+            if (g >= 247.5 && g < 292.5) return "&#8592;";
+            if (g >= 292.5 && g < 337.5) return "&#8598;";
+            return "?";
+        }
+
+        function hentFlydata(id) {
+            var fp = flyplasser[id];
+            var statusEl = document.getElementById("status" + id.charAt(0).toUpperCase() + id.slice(1));
+            var tabellEl = document.getElementById("tabell" + id.charAt(0).toUpperCase() + id.slice(1));
+            var dataBoks = document.getElementById("data" + id.charAt(0).toUpperCase() + id.slice(1));
+
+            statusEl.style.display = "block";
+            statusEl.innerText = "Henter flydata...";
+            tabellEl.style.display = "none";
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", fp.url + "%26_" + new Date().getTime(), true);
+            
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    try {
+                        var data = JSON.parse(xhr.responseText);
+                        var flyIlufta = [];
+                        var flyPåBakken = [];
+
+                        for (var nøkkel in data) {
+                            if (data.hasOwnProperty(nøkkel) && !["full_count", "version", "stats"].includes(nøkkel)) {
+                                var fly = data[nøkkel];
+                                var lat = fly[1];
+                                var lon = fly[2];
+                                var retning = fly[3];
+                                var høyde = fly[4];
+                                var fart = fly[5];
+                                var rute = fly[13] || fly[16] || "Ukjent";
+                                var type = fly[8] || "Ukjent";
+                                var fra = fly[11] || "???";
+                                var til = fly[12] || "???";
+                                var påBakken = fly[14] === 1;
+
+                                var avstand = kalkulerAvstand(fp.lat, fp.lon, lat, lon);
+                                if (avstand > 40.0) continue; // Sone på 40km rundt flyplassen
+
+                                var flyObjekt = { rute: rute, type: type, fra: fra, til: til, høyde: høyde, fart: fart, retning: retning, avstand: avstand };
+
+                                // Sorter ut om flyet er i lufta eller på bakken (nylig landet)
+                                if (påBakken || høyde <= 100) {
+                                    // Vi vil bare ha fly som faktisk har ankommet denne flyplassen
+                                    if (til === fp.kode || til === "???") {
+                                        flyPåBakken.push(flyObjekt);
+                                    }
+                                } else {
+                                    flyIlufta.push(flyObjekt);
+                                }
+                            }
+                        }
+
+                        // Sortering
+                        flyIlufta.sort((a, b) => a.avstand - b.avstand);
+                        flyPåBakken.sort((a, b) => a.avstand - b.avstand);
+
+                        var html = "";
+
+                        // Vis inntil 5 fly i lufta
+                        flyIlufta.slice(0, 5).forEach(f => {
+                            var pil = hentRetningsPil(f.retning);
+                            html += `<tr>
+                                <td><strong>${f.rute}</strong><br><small>${f.type}</small></td>
+                                <td>${f.from || f.fra} -> ${f.til}</td>
+                                <td>I LUFTA<br><small>${f.høyde} ft / ${f.fart} kt</small></td>
+                                <td><span style="font-size:1.1rem;">${pil}</span> ${f.avstand.toFixed(1)} km</td>
+                            </tr>`;
+                        });
+
+                        // Vis inntil 5 fly på bakken (nylig landet)
+                        flyPåBakken.slice(0, 5).forEach(f => {
+                            html += `<tr>
+                                <td><strong>${f.rute}</strong><br><small>${f.type}</small></td>
+                                <td>${f.fra} -> ${fp.kode}</td>
+                                <td class="status-landet">✓ PÅ BAKKEN</td>
+                                <td><small>Ved rullebane/gate</small></td>
+                            </tr>`;
+                        });
+
+                        if (html !== "") {
+                            dataBoks.innerHTML = html;
+                            statusEl.style.display = "none";
+                            tabellEl.style.display = "table";
+                        } else {
+                            statusEl.innerText = "Ingen fly i nærheten akkurat nå.";
+                        }
+
+                    } catch (e) {
+                        statusEl.innerText = "Feil ved tolking av data.";
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function oppdaterAlle() {
+            document.getElementById("time").innerText = new Date().toLocaleTimeString("no-NO");
+            hentFlydata("osl");
+            hentFlydata("tos");
+        }
+
+        setInterval(function () {
+            sekunderIgjen--;
+            if (sekunderIgjen <= 0) {
+                sekunderIgjen = tellerSekunder;
+                oppdaterAlle();
+            }
+            document.getElementById("teller").innerText = sekunderIgjen;
+        }, 1000);
+
+        oppdaterAlle();
+    </script>
+</body>
+</html>
