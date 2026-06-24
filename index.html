@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flyradar (Nook Kompatibel)</title>
+    <title>Flyradar (Gratis GitHub-versjon)</title>
     <style>
         body {
             font-family: monospace, sans-serif;
@@ -141,13 +141,16 @@
     </div>
 
     <script>
+        // En åpen proxy som videresender forespørselen slik at Avinor ikke blokkerer GitHub Pages
+        var avinorProxy = "https://thingproxy.freeboard.io/fetch/";
+
         var flyplasser = {
             osl: {
                 kode: "OSL",
                 lat: 60.197,
                 lon: 11.096,
                 url: "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60.480,59.910,10.510,11.680%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=0%26air=1%26vehicles=0%26estimated=1",
-                avinorUrl: "https://corsproxy.io/?url=" + encodeURIComponent("https://data.avinor.no/flightdata/v1/airport/OSL/arrivals?TimeWindow=1"),
+                avinorUrl: avinorProxy + "https://data.avinor.no/flightdata/v1/airport/OSL/arrivals?TimeWindow=1",
                 statusElId: "statusOsl",
                 seksjonIluftaId: "seksjonIluftaOsl",
                 seksjonLandetId: "seksjonLandetOsl",
@@ -159,7 +162,7 @@
                 lat: 69.683,
                 lon: 18.919,
                 url: "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=69.960,69.400,18.150,19.680%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=0%26air=1%26vehicles=0%26estimated=1",
-                avinorUrl: "https://corsproxy.io/?url=" + encodeURIComponent("https://data.avinor.no/flightdata/v1/airport/TOS/arrivals?TimeWindow=1"),
+                avinorUrl: avinorProxy + "https://data.avinor.no/flightdata/v1/airport/TOS/arrivals?TimeWindow=1",
                 statusElId: "statusTos",
                 seksjonIluftaId: "seksjonIluftaTos",
                 seksjonLandetId: "seksjonLandetTos",
@@ -200,7 +203,6 @@
             document.getElementById(fp.dataElId).innerHTML = "";
             document.getElementById(fp.dataLandetElId).innerHTML = "";
 
-            // Kjør begge kallene helt uavhengig av hverandre for å unngå treghet
             hentFlightradarData(id);
             hentAvinorData(id);
         }
@@ -211,7 +213,9 @@
             var seksjonLandet = document.getElementById(fp.seksjonLandetId);
 
             var avinorXhr = new XMLHttpRequest();
-            avinorXhr.open("GET", fp.avinorUrl + "&cache=" + new Date().getTime(), true);
+            avinorXhr.open("GET", fp.avinorUrl + "&_cb=" + new Date().getTime(), true);
+            avinorXhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+
             avinorXhr.onreadystatechange = function() {
                 if (avinorXhr.readyState === 4 && avinorXhr.status === 200) {
                     try {
