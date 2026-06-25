@@ -37,14 +37,8 @@
             margin-bottom: 20px;
         }
 
-        h1 {
-            margin: 0;
-            font-size: 28px;
-        }
-
-        h1 span {
-            color: var(--accent);
-        }
+        h1 { margin: 0; font-size: 28px; }
+        h1 span { color: var(--accent); }
 
         .status-indicator {
             font-size: 14px;
@@ -52,6 +46,8 @@
             background: var(--card-bg);
             padding: 6px 12px;
             border-radius: 20px;
+            max-width: 50%;
+            text-align: right;
         }
 
         table {
@@ -63,10 +59,7 @@
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
         }
 
-        th, td {
-            padding: 16px;
-            text-align: left;
-        }
+        th, td { padding: 16px; text-align: left; }
 
         th {
             background-color: #111827;
@@ -77,24 +70,11 @@
             letter-spacing: 0.5px;
         }
 
-        tr {
-            border-bottom: 1px solid #334155;
-        }
+        tr { border-bottom: 1px solid #334155; }
+        tr:last-child { border-bottom: none; }
+        tr:hover td { background-color: #253348; }
 
-        tr:last-child {
-            border-bottom: none;
-        }
-
-        tr:hover td {
-            background-color: #253348;
-        }
-
-        .time {
-            font-weight: 700;
-            color: #ffffff;
-            font-size: 16px;
-        }
-
+        .time { font-weight: 700; color: #ffffff; font-size: 16px; }
         .flight-id {
             font-family: monospace;
             background: #0f172a;
@@ -103,15 +83,8 @@
             color: var(--text-main);
         }
 
-        .status-ok {
-            color: var(--success);
-            font-weight: 500;
-        }
-
-        .status-delay {
-            color: var(--danger);
-            font-weight: 600;
-        }
+        .status-ok { color: var(--success); font-weight: 500; }
+        .status-delay { color: var(--danger); font-weight: 600; }
     </style>
 </head>
 <body>
@@ -142,19 +115,29 @@
         const lasterTekst = document.getElementById('laster');
         if (lasterTekst) lasterTekst.innerText = "Oppdaterer...";
 
-        // Den nøyaktige live-URL-en du oppga
         const avinorUrl = "https://asrv.avinor.no/XmlFeed/v1.0?TimeFrom=1&TimeTo=6&airport=TOS";
         
-        // Sender forespørselen gjennom en CORS-proxy slik at GitHub Pages får lov til å lese den
-        const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(avinorUrl);
+        // NY PROXY: Vi bytter til allorigins som fungerer bedre på tvers av GitHub-servere
+        const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(avinorUrl);
 
         try {
             const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error("Proxy svarte ikke korrekt");
+            if (!response.ok) throw new Error("Serveren (proxy) svarte ikke. Status: " + response.status);
             
             const xmlTekst = await response.text();
+            
+            // Sikkerhetssjekk: Hvis proxyen feiler, sender den av og til HTML i stedet for XML
+            if (xmlTekst.trim().startsWith("<!DOCTYPE html>")) {
+                throw new Error("Proxyen opplever stor trafikk akkurat nå.");
+            }
+
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xmlTekst, "application/xml");
+            
+            // Sjekk om XML-parsing var vellykket
+            if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
+                throw new Error("Klarte ikke å lese dataene fra Avinor.");
+            }
             
             const flights = xmlDoc.getElementsByTagName("flight");
             let html = "";
@@ -163,11 +146,9 @@
             for (let i = 0; i < flights.length; i++) {
                 const flight = flights[i];
                 
-                // Filtrerer slik at vi kun viser Avganger ('D'). Endre til 'A' for ankomster.
                 if (flight.getElementsByTagName("arr_dep")[0]?.textContent !== "D") continue;
                 antallFly++;
 
-                // Henter ut tid (formaterer fra f.eks. "2026-06-25T10:30:00Z" til "10:30")
                 const tidRaw = flight.getElementsByTagName("schedule_time")[0]?.textContent;
                 const tid = tidRaw ? tidRaw.substring(11, 16) : "--:--"; 
                 
@@ -175,7 +156,6 @@
                 const selskap = flight.getElementsByTagName("airline")[0]?.textContent || "-";
                 const til = flight.getElementsByTagName("airport")[0]?.textContent || "-";
                 
-                // Logikk for status (forsinkelser, innstillinger)
                 const statusNode = flight.getElementsByTagName("status")[0];
                 let statusTekst = "I rute";
                 let statusKlasse = "status-ok";
@@ -192,7 +172,6 @@
                     } else if (code === "D") {
                         const avreistTid = statusNode.getAttribute("time")?.substring(11, 16);
                         statusTekst = "Gått " + avreistTid;
-                        statusKlasse = "status-ok";
                     }
                 }
 
@@ -213,15 +192,12 @@
             if (lasterTekst) lasterTekst.innerText = "Sist oppdatert: " + new Date().toLocaleTimeString('no-NO', {hour: '2-digit', minute:'2-digit'});
 
         } catch (feil) {
-            console.error("Feil ved henting av Avinor-data:", feil);
-            if (lasterTekst) lasterTekst.innerText = "Tilkoblingsfeil. Prøver igjen...";
+            console.error(feil);
+            if (lasterTekst) lasterTekst.innerText = feil.message;
         }
     }
 
-    // Kjører funksjonen umiddelbart når siden åpnes
     hentFlydata();
-    
-    // Auto-oppdaterer skjermen live hvert 90. sekund
     setInterval(hentFlydata, 90000);
 </script>
 
