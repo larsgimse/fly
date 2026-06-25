@@ -1,17 +1,156 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tromsø Lufthavn (TOS) - Live Flytider</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --success: #22c55e;
+            --danger: #ef4444;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--card-bg);
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+
+        h1 span {
+            color: var(--accent);
+        }
+
+        .status-indicator {
+            font-size: 14px;
+            color: var(--text-muted);
+            background: var(--card-bg);
+            padding: 6px 12px;
+            border-radius: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+        }
+
+        th, td {
+            padding: 16px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #111827;
+            color: var(--accent);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+        }
+
+        tr {
+            border-bottom: 1px solid #334155;
+        }
+
+        tr:last-child {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: #253348;
+        }
+
+        .time {
+            font-weight: 700;
+            color: #ffffff;
+            font-size: 16px;
+        }
+
+        .flight-id {
+            font-family: monospace;
+            background: #0f172a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: var(--text-main);
+        }
+
+        .status-ok {
+            color: var(--success);
+            font-weight: 500;
+        }
+
+        .status-delay {
+            color: var(--danger);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Tromsø Lufthavn <span>• Avganger</span></h1>
+        <div id="laster" class="status-indicator">Kobler til Avinor...</div>
+    </header>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Tid</th>
+                <th>Flynummer</th>
+                <th>Selskap</th>
+                <th>Destinasjon</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="tabell-body">
+            </tbody>
+    </table>
+</div>
+
 <script>
     async function hentFlydata() {
         const lasterTekst = document.getElementById('laster');
         if (lasterTekst) lasterTekst.innerText = "Oppdaterer...";
 
-        // Den nøyaktige URL-en du oppga
+        // Den nøyaktige live-URL-en du oppga
         const avinorUrl = "https://asrv.avinor.no/XmlFeed/v1.0?TimeFrom=1&TimeTo=6&airport=TOS";
         
-        // Vi bruker corsproxy.io som fungerer perfekt fra GitHub Pages
+        // Sender forespørselen gjennom en CORS-proxy slik at GitHub Pages får lov til å lese den
         const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(avinorUrl);
 
         try {
             const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error("Kunne ikke hente data");
+            if (!response.ok) throw new Error("Proxy svarte ikke korrekt");
             
             const xmlTekst = await response.text();
             const parser = new DOMParser();
@@ -19,56 +158,72 @@
             
             const flights = xmlDoc.getElementsByTagName("flight");
             let html = "";
+            let antallFly = 0;
 
             for (let i = 0; i < flights.length; i++) {
                 const flight = flights[i];
                 
-                // Henter kun avganger ('D'). Endre til 'A' for ankomster hvis ønskelig.
+                // Filtrerer slik at vi kun viser Avganger ('D'). Endre til 'A' for ankomster.
                 if (flight.getElementsByTagName("arr_dep")[0]?.textContent !== "D") continue;
+                antallFly++;
 
+                // Henter ut tid (formaterer fra f.eks. "2026-06-25T10:30:00Z" til "10:30")
                 const tidRaw = flight.getElementsByTagName("schedule_time")[0]?.textContent;
                 const tid = tidRaw ? tidRaw.substring(11, 16) : "--:--"; 
+                
                 const flynr = flight.getElementsByTagName("flight_id")[0]?.textContent || "-";
                 const selskap = flight.getElementsByTagName("airline")[0]?.textContent || "-";
                 const til = flight.getElementsByTagName("airport")[0]?.textContent || "-";
                 
+                // Logikk for status (forsinkelser, innstillinger)
                 const statusNode = flight.getElementsByTagName("status")[0];
-                let status = "I rute";
-                let klasse = "status-ok";
+                let statusTekst = "I rute";
+                let statusKlasse = "status-ok";
                 
                 if (statusNode) {
                     const kode = statusNode.getAttribute("code");
                     if (code === "E") {
                         const nyTid = statusNode.getAttribute("time")?.substring(11, 16);
-                        status = "Ny tid: " + nyTid;
-                        klasse = "status-delay";
+                        statusTekst = "Ny tid: " + nyTid;
+                        statusKlasse = "status-delay";
                     } else if (code === "C") {
-                        status = "Innstilt";
-                        klasse = "status-delay";
+                        statusTekst = "Innstilt";
+                        statusKlasse = "status-delay";
+                    } else if (code === "D") {
+                        const avreistTid = statusNode.getAttribute("time")?.substring(11, 16);
+                        statusTekst = "Gått " + avreistTid;
+                        statusKlasse = "status-ok";
                     }
                 }
 
                 html += `<tr>
-                    <td><b>${tid}</b></td>
-                    <td>${flynr}</td>
+                    <td class="time">${tid}</td>
+                    <td><span class="flight-id">${flynr}</span></td>
                     <td>${selskap}</td>
-                    <td>${til}</td>
-                    <td class="${klasse}">${status}</td>
+                    <td><b>${til}</b></td>
+                    <td class="${statusKlasse}">${statusTekst}</td>
                 </tr>`;
             }
 
+            if (antallFly === 0) {
+                html = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Ingen planlagte flyvninger de neste 6 timene.</td></tr>`;
+            }
+
             document.getElementById('tabell-body').innerHTML = html;
-            if (lasterTekst) lasterTekst.innerText = "Sist oppdatert: " + new Date().toLocaleTimeString();
+            if (lasterTekst) lasterTekst.innerText = "Sist oppdatert: " + new Date().toLocaleTimeString('no-NO', {hour: '2-digit', minute:'2-digit'});
 
         } catch (feil) {
-            console.error("Feil:", feil);
-            if (lasterTekst) lasterTekst.innerText = "Feil ved oppdatering. Prøv igjen.";
+            console.error("Feil ved henting av Avinor-data:", feil);
+            if (lasterTekst) lasterTekst.innerText = "Tilkoblingsfeil. Prøver igjen...";
         }
     }
 
-    // Hent data med en gang siden lastes
+    // Kjører funksjonen umiddelbart når siden åpnes
     hentFlydata();
     
-    // Oppdater hvert 2. minutt automatisk
-    setInterval(hentFlydata, 120000);
+    // Auto-oppdaterer skjermen live hvert 90. sekund
+    setInterval(hentFlydata, 90000);
 </script>
+
+</body>
+</html>
