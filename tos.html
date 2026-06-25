@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tromsø Lufthavn - Flytider</title>
+    <style>
+        :root {
+            --primary: #0f172a;
+            --accent: #38bdf8;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        h1 span {
+            color: var(--accent);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            background: rgba(255,255,255,0.1);
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background-color: var(--accent);
+            color: var(--primary);
+        }
+
+        .status-msg {
+            text-align: center;
+            padding: 40px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            font-size: 16px;
+            color: #64748b;
+            box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+        }
+
+        .board {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            overflow: hidden;
+            display: none;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f1f5f9;
+            color: #475569;
+            font-weight: 600;
+            padding: 16px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 15px;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: #f8fafc;
+        }
+
+        .time {
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .flight-id {
+            font-family: monospace;
+            font-weight: 600;
+            background: #e2e8f0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        /* Visuelle flyselskap-merker */
+        .airline-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+        }
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* Statusfarger */
+        .status { font-weight: 600; padding: 4px 8px; border-radius: 4px; display: inline-block; font-size: 13px;}
+        .status-normal { background: #f1f5f9; color: #475569; }
+        .status-delayed { background: #fef2f2; color: #ef4444; }
+        .status-landed { background: #f0fdf4; color: #22c55e; }
+        .status-cancelled { background: #fee2e2; color: #dc2626; text-decoration: line-through; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Tromsø Lufthavn <span>• TOS</span></h1>
+        <div class="tabs">
+            <button id="btn-D" class="tab-btn active" onclick="byttRetning('D')">Avganger</button>
+            <button id="btn-A" class="tab-btn" onclick="byttRetning('A')">Ankomster</button>
+        </div>
+    </header>
+
+    <div id="loader" class="status-msg">Kobler til Avinor og henter flytider...</div>
+
+    <div id="board-wrapper" class="board">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tid</th>
+                    <th>Flynummer</th>
+                    <th>Flyselskap</th>
+                    <th id="table-header-destination">Destinasjon</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="board-body">
+                </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // URL-en du oppga, kjørt gjennom en CORS-proxy for å fungere i nettleseren
+    const avinorUrl = "https://asrv.avinor.no/XmlFeed/v1.0?TimeFrom=1&TimeTo=6&airport=TOS";
+    const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(avinorUrl);
+
+    let xmlDoc = null;
+    let gjeldendeRetning = 'D';
+
+    // Enkel ordbok for å gjøre de kjedelige kodene visuelt pene
+    const airlineMeta = {
+        'SK': { navn: 'SAS', farge: '#003399' },
+        'DY': { navn: 'Norwegian', farge: '#d9251c' },
+        'WF': { navn: 'Widerøe', farge: '#006633' },
+        'D8': { navn: 'Norwegian Int.', farge: '#d9251c' },
+        'LH': { navn: 'Lufthansa', farge: '#f39c12' },
+        'KL': { navn: 'KLM', farge: '#00a1de' }
+    };
+
+    async function hentData() {
+        try {
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error("Kunne ikke kontakte serveren.");
+            const xmlText = await response.text();
+            
+            const parser = new DOMParser();
+            xmlDoc = parser.parseFromString(xmlText, "application/xml");
+            
+            tegnTabell();
+        } catch (error) {
+            console.error(error);
+            document.getElementById('loader').innerText = "Feil: Kunne ikke hente oppdaterte flytider akkurat nå.";
+        }
+    }
+
+    function byttRetning(retning) {
+        gjeldendeRetning = retning;
+        document.getElementById('btn-D').classList.toggle('active', retning === 'D');
+        document.getElementById('btn-A').classList.toggle('active', retning === 'A');
+        
+        // Oppdater tabellheadingen basert på om det er avgang eller ankomst
+        document.getElementById('table-header-destination').innerText = retning === 'D' ? 'Flyr til' : 'Kommer fra';
+        
+        if (xmlDoc) tegnTabell();
+    }
+
+    function tegnTabell() {
+        const flights = xmlDoc.getElementsByTagName("flight");
+        const tbody = document.getElementById("board-body");
+        tbody.innerHTML = "";
+        
+        let antall = 0;
+
+        for (let i = 0; i < flights.length; i++) {
+            const flight = flights[i];
+            const arrDep = flight.getElementsByTagName("arr_dep")[0]?.textContent;
+            
+            if (arrDep !== gjeldendeRetning) continue;
+            antall++;
+
+            // Datauttrekk
+            const tidRaw = flight.getElementsByTagName("schedule_time")[0]?.textContent;
+            const tid = tidRaw ? new Date(tidRaw).toLocaleTimeString('no-NO', {hour: '2-digit', minute:'2-digit'}) : '--:--';
+            const flynummer = flight.getElementsByTagName("flight_id")[0]?.textContent || '-';
+            const selskapKode = flight.getElementsByTagName("airline")[0]?.textContent || '-';
+            const flyplassKode = flight.getElementsByTagName("airport")[0]?.textContent || '-';
+
+            // Fikse flyselskapsnavn og fargekode
+            const meta = airlineMeta[selskapKode] || { navn: selskapKode, farge: '#64748b' };
+            const selskapHtml = `<div class="airline-badge"><span class="dot" style="background:${meta.farge}"></span>${meta.navn}</div>`;
+
+            // Statushåndtering
+            const statusNode = flight.getElementsByTagName("status")[0];
+            let statusVisning = `<span class="status status-normal">I rute</span>`;
+
+            if (statusNode) {
+                const kode = statusNode.getAttribute("code");
+                const statusTidRaw = statusNode.getAttribute("time");
+                const statusTid = statusTidRaw ? new Date(statusTidRaw).toLocaleTimeString('no-NO', {hour: '2-digit', minute:'2-digit'}) : '';
+
+                if (kode === "E") statusVisning = `<span class="status status-delayed">Ny tid: ${statusTid}</span>`;
+                else if (kode === "A") statusVisning = `<span class="status status-landed">Landet ${statusTid}</span>`;
+                else if (kode === "D") statusVisning = `<span class="status status-landed">Avreist ${statusTid}</span>`;
+                else if (kode === "C") statusVisning = `<span class="status status-cancelled">Innstilt</span>`;
+            }
+
+            const rad = `
+                <tr>
+                    <td class="time">${tid}</td>
+                    <td><span class="flight-id">${flynummer}</span></td>
+                    <td>${selskapHtml}</td>
+                    <td><b>${flyplassKode}</b></td>
+                    <td>${statusVisning}</td>
+                </tr>
+            `;
+            tbody.innerHTML += rad;
+        }
+
+        // Vis/skjul lastermelding og tabell
+        document.getElementById('loader').style.display = antall === 0 ? 'block' : 'none';
+        document.getElementById('board-wrapper').style.display = antall === 0 ? 'none' : 'block';
+        
+        if(antall === 0) {
+            document.getElementById('loader').innerText = "Ingen planlagte flyvninger funnet i dette tidsrommet.";
+        }
+    }
+
+    // Start henting med en gang siden åpnes
+    hentData();
+    
+    // Auto-oppdater hvert 3. minutt (slik Avinor anbefaler)
+    setInterval(hentData, 180000);
+</script>
+
+</body>
+</html>
