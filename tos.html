@@ -46,8 +46,6 @@
             background: var(--card-bg);
             padding: 6px 12px;
             border-radius: 20px;
-            max-width: 50%;
-            text-align: right;
         }
 
         table {
@@ -111,47 +109,63 @@
 </div>
 
 <script>
+    async function fetchWithFallback(urls) {
+        for (let url of urls) {
+            try {
+                const response = await fetch(url);
+                if (response.ok) return await response.text();
+            } catch (e) {
+                console.warn("En proxy feilet, prøver neste...", e);
+            }
+        }
+        throw new Error("Avinor-serveren er overbelastet (Timeout). Prøver igjen om litt...");
+    }
+
     async function hentFlydata() {
         const lasterTekst = document.getElementById('laster');
         if (lasterTekst) lasterTekst.innerText = "Oppdaterer...";
 
-        const avinorUrl = "https://asrv.avinor.no/XmlFeed/v1.0?TimeFrom=1&TimeTo=6&airport=TOS";
+        // Vi fjerner filteret og henter den ferdiggenererte live-feeden. Dette er Mye raskere for Avinors servere!
+        const avinorUrl = "https://asrv.avinor.no/XmlFeed/v1.0?airport=TOS";
         
-        // NY PROXY: Vi bytter til allorigins som fungerer bedre på tvers av GitHub-servere
-        const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(avinorUrl);
+        // Vi setter opp to forskjellige proxyer. Hvis den første tidsavbryter (408), hopper koden automatisk til nr 2.
+        const proxyUrls = [
+            "https://corsproxy.io/?" + encodeURIComponent(avinorUrl),
+            "https://api.allorigins.win/raw?url=" + encodeURIComponent(avinorUrl)
+        ];
 
         try {
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error("Serveren (proxy) svarte ikke. Status: " + response.status);
-            
-            const xmlTekst = await response.text();
-            
-            // Sikkerhetssjekk: Hvis proxyen feiler, sender den av og til HTML i stedet for XML
-            if (xmlTekst.trim().startsWith("<!DOCTYPE html>")) {
-                throw new Error("Proxyen opplever stor trafikk akkurat nå.");
-            }
+            const xmlTekst = await fetchWithFallback(proxyUrls);
 
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xmlTekst, "application/xml");
             
-            // Sjekk om XML-parsing var vellykket
             if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
-                throw new Error("Klarte ikke å lese dataene fra Avinor.");
+                throw new Error("Klarte ikke å tolke flydataene.");
             }
             
             const flights = xmlDoc.getElementsByTagName("flight");
             let html = "";
             let antallFly = 0;
+            const na = new Date();
 
             for (let i = 0; i < flights.length; i++) {
                 const flight = flights[i];
                 
+                // Kun avganger
                 if (flight.getElementsByTagName("arr_dep")[0]?.textContent !== "D") continue;
-                antallFly++;
 
                 const tidRaw = flight.getElementsByTagName("schedule_time")[0]?.textContent;
-                const tid = tidRaw ? tidRaw.substring(11, 16) : "--:--"; 
+                if (!tidRaw) continue;
                 
+                const flyTid = new Date(tidRaw);
+                
+                // Vi filtrerer lokalt i nettleseren i stedet! Viser fly som går fra 1 time siden til 6 timer frem i tid
+                const tidsDiffTimer = (flyTid - na) / (1000 * 60 * 60);
+                if (tidsDiffTimer < -1 || tidsDiffTimer > 6) continue;
+
+                antallFly++;
+                const tid = tidRaw.substring(11, 16); 
                 const flynr = flight.getElementsByTagName("flight_id")[0]?.textContent || "-";
                 const selskap = flight.getElementsByTagName("airline")[0]?.textContent || "-";
                 const til = flight.getElementsByTagName("airport")[0]?.textContent || "-";
@@ -185,7 +199,7 @@
             }
 
             if (antallFly === 0) {
-                html = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Ingen planlagte flyvninger de neste 6 timene.</td></tr>`;
+                html = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Ingen planlagte flyvninger akkurat nå.</td></tr>`;
             }
 
             document.getElementById('tabell-body').innerHTML = html;
@@ -198,7 +212,8 @@
     }
 
     hentFlydata();
-    setInterval(hentFlydata, 90000);
+    // Siden dette er mer skånsomt for serveren, oppdaterer vi hvert 2. minutt
+    setInterval(hentFlydata, 120000);
 </script>
 
 </body>
