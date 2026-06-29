@@ -97,12 +97,24 @@
             color: #222222;
         }
     </style>
-    <meta http-equiv="refresh" content="60">
+    <meta http-equiv="refresh" content="900">
+    
+    <script>
+        function updateClock() {
+            const now = new Date();
+            // Tvinger nettleseren til å vise Tromsø-tid (norsk tid) uansett enhet
+            const options = { timeZone: 'Europe/Oslo', hour: '2-digit', minute: '2-digit', hour12: false };
+            const timeString = now.toLocaleTimeString('no-NO', options);
+            document.getElementById('live-clock').innerText = timeString;
+        }
+        // Oppdaterer klokken hvert sekund
+        setInterval(updateClock, 1000);
+    </script>
 </head>
-<body>
+<body onload="updateClock()">
 
     <div class="top-section">
-        <h1 class="clock">00:04</h1>
+        <h1 class="clock" id="live-clock">--:--</h1>
         <div class="date">TUESDAY, JUNE 30</div>
     </div>
     
@@ -113,7 +125,7 @@
             <h2 class="label-top">TROMSØ</h2>
             <h3 class="label-sub">HEAVYRAIN</h3>
             <div class="huge-data">11°</div>
-            <div class="detail-text">VIND: 1 m/s</div>
+            <div class="detail-text">VIND: 2 m/s</div>
             <div class="detail-text">FUKTIGHET: 96%</div>
         </div>
         
