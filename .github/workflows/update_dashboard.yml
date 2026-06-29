@@ -1,0 +1,33 @@
+name: Update Dashboard Image
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # Kjører hvert 30. minutt
+  workflow_dispatch: # Gjør det mulig å starte manuelt
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Sjekk ut kode
+      uses: actions/checkout@v4
+
+    - name: Sett opp Python
+      uses: actions/setup-python@v5
+      with:
+        python-node-version: '3.10'
+
+    - name: Installer avhengigheter
+      run: |
+        pip install Pillow requests FlightRadar24
+
+    - name: Kjør skript
+      run: python app.py
+
+    - name: Commit og Push bildet back til GitHub
+      run: |
+        git config --global user.name 'Github Action'
+        git config --global user.email 'action@github.com'
+        git add dashboard.png
+        git commit -m "Auto-oppdatert dashboard bilde" || exit 0
+        git push
