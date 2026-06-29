@@ -2,11 +2,9 @@ import os
 import requests
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
-from FlightRadar24 import FlightRadar24API
 
 WIDTH, HEIGHT = 800, 600
 LAT, LON = 69.6492, 18.9553  # Tromsø
-AIRPORT_ICAO = "ENTC"        # Tromsø Lufthavn
 USER_AGENT = "NookDashboard/1.0 (+https://github.com/dinbruker)"
 
 def get_weather():
@@ -21,13 +19,20 @@ def get_weather():
         wind = now['wind_speed']
         return f"{temp}°C\nVind: {wind} m/s"
     except Exception as e:
+        print(f"Feil ved henting av vær: {e}")
         return "Vær:\nUtilgjengelig"
 
 def get_next_flight():
     try:
+        # Importerer fra korrekt pakkenavn internt
+        from FlightRadar24 import FlightRadar24API
         fr_api = FlightRadar24API()
-        airport_details = fr_api.get_airport_details(AIRPORT_ICAO)
-        plugin_data = airport_details.get('pluginData', {}) if airport_details else {}
+        airport_details = fr_api.get_airport_details("ENTC")
+        
+        if not airport_details:
+            return "Ingen flydata\ntilgjengelig nå"
+            
+        plugin_data = airport_details.get('pluginData', {})
         schedule = plugin_data.get('schedule', {}) if plugin_data else {}
         arrivals = schedule.get('arrivals', {}).get('data', []) if schedule else []
         
@@ -40,32 +45,44 @@ def get_next_flight():
             sta_epoch = flight_info.get('time', {}).get('scheduled', {}).get('arrival', 0)
             sta_time = datetime.fromtimestamp(sta_epoch).strftime('%H:%M') if sta_epoch else "--:--"
             return f"{sta_time} - {flight_number}\nFra: {origin}"
+        
         return "Ingen planlagte fly"
     except Exception as e:
+        print(f"Feil ved henting av flydata: {e}")
         return "Flydata:\nMidlertidig nede"
 
 def generate_image():
-    image = Image.new("L", (WIDTH, HEIGHT), color=255)
-    draw = ImageDraw.Draw(image)
-    
-    current_time = datetime.now().strftime("%H:%M")
-    current_date = datetime.now().strftime("%A %d. %B")
-    
-    # Tegner tekst med standardfont (større tekst simuleres med linjer/plassering her for testing)
-    draw.text((WIDTH // 2, HEIGHT // 6), f"KLOKKA: {current_time}", fill=0, anchor="mm")
-    draw.text((WIDTH // 2, HEIGHT // 3), current_date, fill=0, anchor="mm")
-    
-    draw.line([(0, HEIGHT // 2), (WIDTH, HEIGHT // 2)], fill=0, width=3)
-    draw.line([(WIDTH // 2, HEIGHT // 2), (WIDTH // 2, HEIGHT)], fill=0, width=3)
-    
-    draw.text((30, HEIGHT // 2 + 40), "TROMSØ VÆR:", fill=0)
-    draw.text((30, HEIGHT // 2 + 80), get_weather(), fill=0)
-    
-    draw.text((WIDTH // 2 + 30, HEIGHT // 2 + 40), "NESTE ANKOMST:", fill=0)
-    draw.text((WIDTH // 2 + 30, HEIGHT // 2 + 80), get_next_flight(), fill=0)
-    
-    image.save("dashboard.png")
-    print("Bildet ble generert!")
+    try:
+        image = Image.new("L", (WIDTH, HEIGHT), color=255)
+        draw = ImageDraw.Draw(image)
+        
+        current_time = datetime.now().strftime("%H:%M")
+        current_date = datetime.now().strftime("%A %d. %B")
+        
+        # Layout
+        draw.text((WIDTH // 2, HEIGHT // 6), f"KLOKKA: {current_time}", fill=0, anchor="mm")
+        draw.text((WIDTH // 2, HEIGHT // 3), current_date, fill=0, anchor="mm")
+        
+        # Skillelinjer
+        draw.line([(0, HEIGHT // 2), (WIDTH, HEIGHT // 2)], fill=0, width=3)
+        draw.line([(WIDTH // 2, HEIGHT // 2), (WIDTH // 2, HEIGHT)], fill=0, width=3)
+        
+        # Vær (Nedre venstre)
+        draw.text((30, HEIGHT // 2 + 40), "TROMSØ VÆR:", fill=0)
+        draw.text((30, HEIGHT // 2 + 80), get_weather(), fill=0)
+        
+        # Fly (Nedre høyre)
+        draw.text((WIDTH // 2 + 30, HEIGHT // 2 + 40), "NESTE ANKOMST:", fill=0)
+        draw.text((WIDTH // 2 + 30, HEIGHT // 2 + 80), get_next_flight(), fill=0)
+        
+        image.save("dashboard.png")
+        print("Bildet ble generert!")
+    except Exception as e:
+        print(f"Kritisk feil under bildegenerering: {e}")
+        img = Image.new("L", (WIDTH, HEIGHT), color=200)
+        draw = ImageDraw.Draw(img)
+        draw.text((WIDTH//2, HEIGHT//2), "Feil under generering", fill=0, anchor="mm")
+        img.save("dashboard.png")
 
 if __name__ == "__main__":
     generate_image()
