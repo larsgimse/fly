@@ -172,7 +172,6 @@ def generate_html():
     </div>
 
     <script>
-        // --- LIVE KLOKKE SCRIPT ---
         function updateClock() {{
             const now = new Date();
             const options = {{ timeZone: 'Europe/Oslo', hour: '2-digit', minute: '2-digit', hour12: false }};
@@ -181,7 +180,6 @@ def generate_html():
         setInterval(updateClock, 1000);
         updateClock();
 
-        // --- LIVE FLYRADAR & AVINOR SCRIPT ---
         var tosLat = 69.683;
         var tosLon = 18.919;
         var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=78.000,52.000,0.000,32.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
@@ -193,7 +191,6 @@ def generate_html():
         }}
 
         function hentFlyData() {{
-            // 1. Hent Flightradar data først
             var xhrRadar = new XMLHttpRequest();
             xhrRadar.open("GET", radarUrl + "%26_=" + new Date().getTime(), true);
             xhrRadar.onreadystatechange = function () {{
@@ -209,13 +206,12 @@ def generate_html():
                                 høyde: f[4] === 0 ? "Bakken" : f[4] + " ft",
                                 fart: f[5] + " kt",
                                 avstand: kalkulerAvstand(tosLat, tosLon, f[1], f[2]),
-                                rutenummer: (f[13] || "").replace(/\s+/g, '').toUpperCase(),
-                                callsign: (f[16] || "").replace(/\s+/g, '').toUpperCase()
+                                rutenummer: (f[13] || "").replace(/\\s+/g, '').toUpperCase(),
+                                callsign: (f[16] || "").replace(/\\s+/g, '').toUpperCase()
                             }});
                         }}
                     }}
                     
-                    // 2. Hent Avinor XML-feeden etterpå
                     var xhrAvinor = new XMLHttpRequest();
                     xhrAvinor.open("GET", "flydata.xml?cachebuster=" + new Date().getTime(), true);
                     xhrAvinor.onreadystatechange = function () {{
@@ -223,7 +219,6 @@ def generate_html():
                             var xmlDoc = new DOMParser().parseFromString(xhrAvinor.responseText, "application/xml");
                             var flights = Array.from(xmlDoc.getElementsByTagName("flight"));
                             
-                            // Filtrer ut kun ankomster (direction 'A') og sorter etter tid
                             var ankomster = flights.filter(f => f.getElementsByTagName("arr_dep")[0].textContent === 'A')
                                 .sort((a,b) => new Date(a.getElementsByTagName("schedule_time")[0].textContent) - new Date(b.getElementsByTagName("schedule_time")[0].textContent));
                             
@@ -241,9 +236,8 @@ def generate_html():
                                 document.getElementById("flight-id").innerText = "FLIGHT: " + flynr;
                                 document.getElementById("flight-origin").innerText = "FRA: " + fraSted.toUpperCase();
                                 
-                                // Prøv å matche med FlightRadar24 live data
                                 var match = null;
-                                var idSøk = flynr.replace(/\s+/g, '').toUpperCase();
+                                var idSøk = flynr.replace(/\\s+/g, '').toUpperCase();
                                 for (var i = 0; i < radarListe.length; i++) {{
                                     var r = radarListe[i];
                                     if (r.rutenummer === idSøk || r.callsign === idSøk.replace("SK", "SAS").replace("WF", "WIF").replace("DY", "NAX")) {{
@@ -257,9 +251,9 @@ def generate_html():
                                     document.getElementById("flight-radar").innerHTML = match.avstand.toFixed(0) + " km unna<br>" + match.høyde + " / " + match.fart;
                                 }} else {{
                                     document.getElementById("flight-status-sub").innerText = "TOS / ENTC";
-                                    document.getElementById("flight-radar").innerText = "Ikke i radar-radarområdet ennå";
+                                    document.getElementById("flight-radar").innerText = "Ikke i radarområdet ennå";
                                 }}
-                            } else {{
+                            }} else {{
                                 document.getElementById("flight-id").innerText = "Ingen planlagte ankomster";
                             }}
                         }}
@@ -270,7 +264,6 @@ def generate_html():
             xhrRadar.send();
         }}
 
-        // Kjør ved oppstart, og oppdater hvert 30. sekund (akkurat som i koden din)
         hentFlyData();
         setInterval(hentFlyData, 30000);
     </script>
@@ -279,7 +272,7 @@ def generate_html():
 """
     with open("time.html", "w", encoding="utf-8") as f:
         f.write(html_content)
-    print("time.html ble generert med integrert Flightradar-klient!")
+    print("time.html ble generert suksessfullt uten f-string feil!")
 
 if __name__ == "__main__":
     generate_html()
