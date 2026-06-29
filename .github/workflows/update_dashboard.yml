@@ -19,9 +19,11 @@ jobs:
 
     - name: Installer avhengigheter
       run: |
-        pip install Pillow requests FlightRadarAPI
+        pip install Pillow requests FlightRadarAPI tzdata
 
-    - name: Kjør skript
+    - name: Kjør skript med Tromsø-tid
+      env:
+        TZ: 'Europe/Oslo' # Setter tidsone for hele kjøringen
       run: python app.py
 
     - name: Commit og Push bildet back til GitHub
