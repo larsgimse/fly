@@ -32,7 +32,8 @@ def generate_html():
     current_date = now_local.strftime("%A, %B %d").upper()
     weather = get_weather()
     
-    html_content = f"""<!DOCTYPE html>
+    # Her bruker vi en helt vanlig streng (INGEN f foran """). Da bryr ikke Python seg om JavaScript/CSS i det hele tatt!
+    html_content = """<!DOCTYPE html>
 <html lang="no">
 <head>
     <meta charset="UTF-8">
@@ -40,7 +41,7 @@ def generate_html():
     <title>Nook Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
-        body {{
+        body {
             font-family: 'Open Sans', sans-serif;
             background-color: #ffffff;
             color: #000000;
@@ -52,64 +53,64 @@ def generate_html():
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-        }}
+        }
         
-        .top-section {{
+        .top-section {
             text-align: center;
             margin-top: 20px;
-        }}
+        }
         
-        .clock {{
+        .clock {
             font-size: 110px;
             font-weight: 700;
             letter-spacing: -2px;
             margin: 0;
             line-height: 1;
-        }}
+        }
         
-        .date {{
+        .date {
             font-size: 22px;
             font-weight: 400;
             color: #555555;
             margin-top: 15px;
             letter-spacing: 1px;
-        }}
+        }
         
-        .divider {{
+        .divider {
             border-top: 1px solid #e0e0e0;
             width: 85%;
             margin: 40px auto;
-        }}
+        }
         
-        .bottom-section {{
+        .bottom-section {
             display: flex;
             flex: 1;
             padding: 0 20px;
-        }}
+        }
         
-        .column {{
+        .column {
             flex: 1;
             display: flex;
             flex-direction: column;
-        }}
+        }
         
-        .left-column {{
+        .left-column {
             padding-right: 20px;
             border-right: 1px solid #e0e0e0;
-        }}
+        }
         
-        .right-column {{
+        .right-column {
             padding-left: 30px;
-        }}
+        }
         
-        .label-top {{
+        .label-top {
             font-size: 16px;
             font-weight: 700;
             letter-spacing: 2px;
             margin: 0 0 5px 0;
-        }}
+        }
         
-        .label-sub {{
+        .label-sub {
             font-size: 14px;
             font-weight: 400;
             color: #777777;
@@ -117,21 +118,21 @@ def generate_html():
             letter-spacing: 1px;
         }}
         
-        .huge-data {{
+        .huge-data {
             font-size: 75px;
             font-weight: 700;
             margin: 0 0 25px 0;
             line-height: 1;
-        }}
+        }
         
-        .detail-text {{
+        .detail-text {
             font-size: 18px;
             font-weight: 400;
             margin: 8px 0;
             color: #222222;
-        }}
+        }
 
-        .radar-live-badge {{
+        .radar-live-badge {
             display: inline-block;
             background-color: #000000;
             color: #ffffff;
@@ -140,14 +141,14 @@ def generate_html():
             font-weight: bold;
             margin-left: 10px;
             vertical-align: middle;
-        }}
+        }
     </style>
 </head>
 <body>
 
     <div class="top-section">
         <h1 class="clock" id="live-clock">--:--</h1>
-        <div class="date">{current_date}</div>
+        <div class="date">__CURRENT_DATE__</div>
     </div>
     
     <div class="divider"></div>
@@ -155,10 +156,10 @@ def generate_html():
     <div class="bottom-section">
         <div class="column left-column">
             <h2 class="label-top">TROMSØ</h2>
-            <h3 class="label-sub">{weather["summary"]}</h3>
-            <div class="huge-data">{weather["temp"]}</div>
-            <div class="detail-text">VIND: {weather["wind"]}</div>
-            <div class="detail-text">FUKTIGHET: {weather["humidity"]}</div>
+            <h3 class="label-sub">__WEATHER_SUMMARY__</h3>
+            <div class="huge-data">__WEATHER_TEMP__</div>
+            <div class="detail-text">VIND: __WEATHER_WIND__</div>
+            <div class="detail-text">FUKTIGHET: __WEATHER_HUMIDITY__</div>
         </div>
         
         <div class="column right-column">
@@ -172,11 +173,11 @@ def generate_html():
     </div>
 
     <script>
-        function updateClock() {{
+        function updateClock() {
             const now = new Date();
-            const options = {{ timeZone: 'Europe/Oslo', hour: '2-digit', minute: '2-digit', hour12: false }};
+            const options = { timeZone: 'Europe/Oslo', hour: '2-digit', minute: '2-digit', hour12: false };
             document.getElementById('live-clock').innerText = now.toLocaleTimeString('no-NO', options);
-        }}
+        }
         setInterval(updateClock, 1000);
         updateClock();
 
@@ -184,45 +185,45 @@ def generate_html():
         var tosLon = 18.919;
         var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=78.000,52.000,0.000,32.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
 
-        function kalkulerAvstand(lat1, lon1, lat2, lon2) {{
+        function kalkulerAvstand(lat1, lon1, lat2, lon2) {
             var x = (lon2 - lon1) * Math.cos((lat1 + lat2) / 2 * Math.PI / 180) * 111.32;
             var y = (lat2 - lat1) * 111.13;
             return Math.sqrt(x * x + y * y);
-        }}
+        }
 
-        function hentFlyData() {{
+        function hentFlyData() {
             var xhrRadar = new XMLHttpRequest();
             xhrRadar.open("GET", radarUrl + "%26_=" + new Date().getTime(), true);
-            xhrRadar.onreadystatechange = function () {{
-                if (xhrRadar.readyState === 4 && xhrRadar.status === 200) {{
+            xhrRadar.onreadystatechange = function () {
+                if (xhrRadar.readyState === 4 && xhrRadar.status === 200) {
                     var radarData = JSON.parse(xhrRadar.responseText);
                     var radarListe = [];
                     
-                    for (var nøkkel in radarData) {{
-                        if (nøkkel !== "full_count" && nøkkel !== "version" && nøkkel !== "stats") {{
+                    for (var nøkkel in radarData) {
+                        if (nøkkel !== "full_count" && nøkkel !== "version" && nøkkel !== "stats") {
                             var f = radarData[nøkkel];
-                            radarListe.push({{
+                            radarListe.push({
                                 id: nøkkel,
                                 høyde: f[4] === 0 ? "Bakken" : f[4] + " ft",
                                 fart: f[5] + " kt",
                                 avstand: kalkulerAvstand(tosLat, tosLon, f[1], f[2]),
-                                rutenummer: (f[13] || "").replace(/\\s+/g, '').toUpperCase(),
-                                callsign: (f[16] || "").replace(/\\s+/g, '').toUpperCase()
-                            }});
-                        }}
-                    }}
+                                rutenummer: (f[13] || "").replace(/\s+/g, '').toUpperCase(),
+                                callsign: (f[16] || "").replace(/\s+/g, '').toUpperCase()
+                            });
+                        }
+                    }
                     
                     var xhrAvinor = new XMLHttpRequest();
                     xhrAvinor.open("GET", "flydata.xml?cachebuster=" + new Date().getTime(), true);
-                    xhrAvinor.onreadystatechange = function () {{
-                        if (xhrAvinor.readyState === 4 && xhrAvinor.status === 200) {{
+                    xhrAvinor.onreadystatechange = function () {
+                        if (xhrAvinor.readyState === 4 && xhrAvinor.status === 200) {
                             var xmlDoc = new DOMParser().parseFromString(xhrAvinor.responseText, "application/xml");
                             var flights = Array.from(xmlDoc.getElementsByTagName("flight"));
                             
                             var ankomster = flights.filter(f => f.getElementsByTagName("arr_dep")[0].textContent === 'A')
                                 .sort((a,b) => new Date(a.getElementsByTagName("schedule_time")[0].textContent) - new Date(b.getElementsByTagName("schedule_time")[0].textContent));
                             
-                            if (ankomster.length > 0) {{
+                            if (ankomster.length > 0) {
                                 var nesteFly = ankomster[0];
                                 var flynr = nesteFly.getElementsByTagName("flight_id")[0].textContent;
                                 var fraSted = nesteFly.getElementsByTagName("airport")[0].textContent;
@@ -237,32 +238,32 @@ def generate_html():
                                 document.getElementById("flight-origin").innerText = "FRA: " + fraSted.toUpperCase();
                                 
                                 var match = null;
-                                var idSøk = flynr.replace(/\\s+/g, '').toUpperCase();
-                                for (var i = 0; i < radarListe.length; i++) {{
+                                var idSøk = flynr.replace(/\s+/g, '').toUpperCase();
+                                for (var i = 0; i < radarListe.length; i++) {
                                     var r = radarListe[i];
-                                    if (r.rutenummer === idSøk || r.callsign === idSøk.replace("SK", "SAS").replace("WF", "WIF").replace("DY", "NAX")) {{
+                                    if (r.rutenummer === idSøk || r.callsign === idSøk.replace("SK", "SAS").replace("WF", "WIF").replace("DY", "NAX")) {
                                         match = r;
                                         break;
-                                    }}
-                                }}
+                                    }
+                                }
                                 
-                                if (match) {{
+                                if (match) {
                                     document.getElementById("flight-status-sub").innerHTML = "TOS / ENTC <span class='radar-live-badge'>RADAR LIVE</span>";
                                     document.getElementById("flight-radar").innerHTML = match.avstand.toFixed(0) + " km unna<br>" + match.høyde + " / " + match.fart;
-                                }} else {{
+                                } else {
                                     document.getElementById("flight-status-sub").innerText = "TOS / ENTC";
                                     document.getElementById("flight-radar").innerText = "Ikke i radarområdet ennå";
-                                }}
-                            }} else {{
+                                }
+                            } else {
                                 document.getElementById("flight-id").innerText = "Ingen planlagte ankomster";
-                            }}
-                        }}
-                    }};
+                            }
+                        }
+                    };
                     xhrAvinor.send();
                 }
-            }};
+            };
             xhrRadar.send();
-        }}
+        }
 
         hentFlyData();
         setInterval(hentFlyData, 30000);
@@ -270,9 +271,17 @@ def generate_html():
 </body>
 </html>
 """
+    
+    # Vi gjør en god gammeldags utskifting av merkelappene på slutten
+    html_content = html_content.replace("__CURRENT_DATE__", current_date)
+    html_content = html_content.replace("__WEATHER_SUMMARY__", weather["summary"])
+    html_content = html_content.replace("__WEATHER_TEMP__", weather["temp"])
+    html_content = html_content.replace("__WEATHER_WIND__", weather["wind"])
+    html_content = html_content.replace("__WEATHER_HUMIDITY__", weather["humidity"])
+
     with open("time.html", "w", encoding="utf-8") as f:
         f.write(html_content)
-    print("time.html ble generert suksessfullt uten f-string feil!")
+    print("time.html ble generert helt uten kompileringsfeil!")
 
 if __name__ == "__main__":
     generate_html()
