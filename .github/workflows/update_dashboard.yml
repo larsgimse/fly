@@ -15,7 +15,7 @@ jobs:
     - name: Sett opp Python
       uses: actions/setup-python@v5
       with:
-        python-node-version: '3.10'
+        python-version: '3.10' # Fikset fra python-node-version
 
     - name: Installer avhengigheter
       run: |
@@ -29,5 +29,6 @@ jobs:
         git config --global user.name 'Github Action'
         git config --global user.email 'action@github.com'
         git add dashboard.png
-        git commit -m "Auto-oppdatert dashboard bilde" || exit 0
+        # '|| true' sikrer at workflowen ikke feiler hvis det ikke er noen endringer i bildet
+        git commit -m "Auto-oppdatert dashboard bilde" || true 
         git push
