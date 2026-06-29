@@ -2,8 +2,8 @@ name: Update Dashboard Image
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # Kjører hvert 30. minutt
-  workflow_dispatch: # Gjør det mulig å starte manuelt
+    - cron: '*/30 * * * *' # Kjører automatisk hvert 30. minutt
+  workflow_dispatch: # Gjør at du kan starte den manuelt når du vil
 
 jobs:
   build:
@@ -15,7 +15,7 @@ jobs:
     - name: Sett opp Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10' # Fikset fra python-node-version
+        python-version: '3.10'
 
     - name: Installer avhengigheter
       run: |
@@ -29,6 +29,5 @@ jobs:
         git config --global user.name 'Github Action'
         git config --global user.email 'action@github.com'
         git add dashboard.png
-        # '|| true' sikrer at workflowen ikke feiler hvis det ikke er noen endringer i bildet
-        git commit -m "Auto-oppdatert dashboard bilde" || true 
+        git commit -m "Auto-oppdatert dashboard bilde" || true
         git push
