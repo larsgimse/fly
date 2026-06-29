@@ -19,7 +19,7 @@ jobs:
 
     - name: Installer avhengigheter
       run: |
-        pip install Pillow requests FlightRadar24
+        pip install Pillow requests FlightRadarAPI
 
     - name: Kjør skript
       run: python app.py
