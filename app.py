@@ -54,7 +54,6 @@ def get_next_flight():
 
 def generate_html():
     now_local = datetime.now(TIMEZONE)
-    current_time = now_local.strftime("%H:%M")
     current_date = now_local.strftime("%A, %B %d").upper()
     
     weather = get_weather()
@@ -159,12 +158,24 @@ def generate_html():
             color: #222222;
         }}
     </style>
-    <meta http-equiv="refresh" content="60">
+    <meta http-equiv="refresh" content="900">
+    
+    <script>
+        function updateClock() {{
+            const now = new Date();
+            // Tvinger nettleseren til å vise Tromsø-tid (norsk tid) uansett enhet
+            const options = {{ timeZone: 'Europe/Oslo', hour: '2-digit', minute: '2-digit', hour12: false }};
+            const timeString = now.toLocaleTimeString('no-NO', options);
+            document.getElementById('live-clock').innerText = timeString;
+        }}
+        // Oppdaterer klokken hvert sekund
+        setInterval(updateClock, 1000);
+    </script>
 </head>
-<body>
+<body onload="updateClock()">
 
     <div class="top-section">
-        <h1 class="clock">{current_time}</h1>
+        <h1 class="clock" id="live-clock">--:--</h1>
         <div class="date">{current_date}</div>
     </div>
     
@@ -191,7 +202,6 @@ def generate_html():
 </body>
 </html>
 """
-    # Lagrer nå som time.html i stedet
     with open("time.html", "w", encoding="utf-8") as f:
         f.write(html_content)
     print("time.html ble generert!")
