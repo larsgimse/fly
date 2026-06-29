@@ -1,0 +1,295 @@
+import os
+import requests
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+LAT, LON = 69.6492, 18.9553  # Tromsø
+USER_AGENT = "NookDashboard/1.0 (+https://github.com/dinbruker)"
+TIMEZONE = ZoneInfo("Europe/Oslo")
+
+def get_weather():
+    headers = {'User-Agent': USER_AGENT}
+    url = f"https://api.met.no/weatherapi/locationforecast/2.0/compact?lat={LAT}&lon={LON}"
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        now = data['properties']['timeseries'][0]['data']['instant']['details']
+        temp = round(now['air_temperature'])
+        wind = round(now['wind_speed'])
+        humidity = round(now['relative_humidity'])
+        
+        next_hour = data['properties']['timeseries'][0]['data'].get('next_1_hours', {})
+        summary = next_hour.get('summary', {}).get('symbol_code', 'unknown')
+        
+        weather_text = summary.replace("_day", "").replace("_night", "").replace("_", " ").upper()
+        return {"temp": f"{temp}°", "wind": f"{wind} m/s", "humidity": f"{humidity}%", "summary": weather_text}
+    except Exception as e:
+        return {"temp": "--°", "wind": "- m/s", "humidity": "-%", "summary": "UKJENT VÆR"}
+
+def generate_html():
+    now_local = datetime.now(TIMEZONE)
+    current_date = now_local.strftime("%A, %B %d").upper()
+    weather = get_weather()
+    
+    html_content = """<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nook Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            margin: 0;
+            padding: 40px 20px;
+            width: 600px;
+            height: 800px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .top-section {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .clock {
+            font-size: 110px;
+            font-weight: 700;
+            letter-spacing: -2px;
+            margin: 0;
+            line-height: 1;
+        }
+        
+        .date {
+            font-size: 22px;
+            font-weight: 400;
+            color: #555555;
+            margin-top: 15px;
+            letter-spacing: 1px;
+        }
+        
+        .divider {
+            border-top: 1px solid #e0e0e0;
+            width: 85%;
+            margin: 40px auto;
+        }
+        
+        .bottom-section {
+            display: flex;
+            flex: 1;
+            padding: 0 20px;
+        }
+        
+        .column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .left-column {
+            padding-right: 20px;
+            border-right: 1px solid #e0e0e0;
+        }
+        
+        .right-column {
+            padding-left: 30px;
+        }
+        
+        .label-top {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            margin: 0 0 5px 0;
+        }
+        
+        .label-sub {
+            font-size: 14px;
+            font-weight: 400;
+            color: #777777;
+            margin: 0 0 35px 0;
+            letter-spacing: 1px;
+        }
+        
+        .huge-data {
+            font-size: 75px;
+            font-weight: 700;
+            margin: 0 0 25px 0;
+            line-height: 1;
+        }
+        
+        .detail-text {
+            font-size: 18px;
+            font-weight: 400;
+            margin: 8px 0;
+            color: #222222;
+        }
+
+        .radar-live-badge {
+            display: inline-block;
+            background-color: #000000;
+            color: #ffffff;
+            font-size: 12px;
+            padding: 2px 6px;
+            font-weight: bold;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-section">
+        <h1 class="clock" id="live-clock">--:--</h1>
+        <div class="date">__CURRENT_DATE__</div>
+    </div>
+    
+    <div class="divider"></div>
+    
+    <div class="bottom-section">
+        <div class="column left-column">
+            <h2 class="label-top">TROMSØ</h2>
+            <h3 class="label-sub">__WEATHER_SUMMARY__</h3>
+            <div class="huge-data">__WEATHER_TEMP__</div>
+            <div class="detail-text">VIND: __WEATHER_WIND__</div>
+            <div class="detail-text">FUKTIGHET: __WEATHER_HUMIDITY__</div>
+        </div>
+        
+        <div class="column right-column">
+            <h2 class="label-top">NESTE ANKOMST</h2>
+            <h3 class="label-sub" id="flight-status-sub">TOS / ENTC</h3>
+            <div class="huge-data" id="flight-time">--:--</div>
+            <div class="detail-text" id="flight-id">Henter ruter...</div>
+            <div class="detail-text" id="flight-origin">FRA: -</div>
+            <div class="detail-text" id="flight-radar" style="font-weight: bold; margin-top: 15px;">Søker etter fly på radar...</div>
+        </div>
+    </div>
+
+    <script>
+        function updateClock() {
+            const now = new Date();
+            const options = { timeZone: 'Europe/Oslo', hour: '2-digit', minute: '2-digit', hour12: false };
+            document.getElementById('live-clock').innerText = now.toLocaleTimeString('no-NO', options);
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        var tosLat = 69.683;
+        var tosLon = 18.919;
+        var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=78.000,52.000,0.000,32.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
+
+        function kalkulerAvstand(lat1, lon1, lat2, lon2) {
+            var x = (lon2 - lon1) * Math.cos((lat1 + lat2) / 2 * Math.PI / 180) * 111.32;
+            var y = (lat2 - lat1) * 111.13;
+            return Math.sqrt(x * x + y * y);
+        }
+
+        function oppdaterSkjermMedAvinor(radarListe) {
+            var xhrAvinor = new XMLHttpRequest();
+            xhrAvinor.open("GET", "flydata.xml?cachebuster=" + new Date().getTime(), true);
+            xhrAvinor.onreadystatechange = function () {
+                if (xhrAvinor.readyState === 4 && xhrAvinor.status === 200) {
+                    var xmlDoc = new DOMParser().parseFromString(xhrAvinor.responseText, "application/xml");
+                    var flights = Array.from(xmlDoc.getElementsByTagName("flight"));
+                    
+                    var ankomster = flights.filter(f => f.getElementsByTagName("arr_dep")[0].textContent === 'A')
+                        .sort((a,b) => new Date(a.getElementsByTagName("schedule_time")[0].textContent) - new Date(b.getElementsByTagName("schedule_time")[0].textContent));
+                    
+                    if (ankomster.length > 0) {
+                        var nesteFly = ankomster[0];
+                        var flynr = nesteFly.getElementsByTagName("flight_id")[0].textContent;
+                        var fraSted = nesteFly.getElementsByTagName("airport")[0].textContent;
+                        var tidRaw = nesteFly.getElementsByTagName("schedule_time")[0].textContent;
+                        
+                        var dato = new Date(tidRaw);
+                        var t = dato.getHours().toString().padStart(2, '0');
+                        var m = dato.getMinutes().toString().padStart(2, '0');
+                        
+                        document.getElementById("flight-time").innerText = t + ":" + m;
+                        document.getElementById("flight-id").innerText = "FLIGHT: " + flynr;
+                        document.getElementById("flight-origin").innerText = "FRA: " + fraSted.toUpperCase();
+                        
+                        var match = null;
+                        var idSøk = flynr.replace(/\s+/g, '').toUpperCase();
+                        for (var i = 0; i < radarListe.length; i++) {
+                            var r = radarListe[i];
+                            if (r.rutenummer === idSøk || r.callsign === idSøk.replace("SK", "SAS").replace("WF", "WIF").replace("DY", "NAX")) {
+                                match = r;
+                                break;
+                            }
+                        }
+                        
+                        if (match) {
+                            document.getElementById("flight-status-sub").innerHTML = "TOS / ENTC <span class='radar-live-badge'>RADAR LIVE</span>";
+                            document.getElementById("flight-radar").innerHTML = match.avstand.toFixed(0) + " km unna<br>" + match.høyde + " / " + match.fart;
+                        } else {
+                            document.getElementById("flight-status-sub").innerText = "TOS / ENTC";
+                            document.getElementById("flight-radar").innerText = "Ikke i radarområdet ennå";
+                        }
+                    } else {
+                        document.getElementById("flight-id").innerText = "Ingen planlagte ankomster";
+                        document.getElementById("flight-radar").innerText = "-";
+                    }
+                }
+            };
+            xhrAvinor.send();
+        }
+
+        function hentFlyData() {
+            var xhrRadar = new XMLHttpRequest();
+            xhrRadar.open("GET", radarUrl + "%26_=" + new Date().getTime(), true);
+            xhrRadar.onreadystatechange = function () {
+                if (xhrRadar.readyState === 4) {
+                    var radarListe = [];
+                    if (xhrRadar.status === 200) {
+                        try {
+                            var radarData = JSON.parse(xhrRadar.responseText);
+                            for (var nøkkel in radarData) {
+                                if (nøkkel !== "full_count" && nøkkel !== "version" && nøkkel !== "stats") {
+                                    var f = radarData[nøkkel];
+                                    radarListe.push({
+                                        id: nøkkel,
+                                        høyde: f[4] === 0 ? "Bakken" : f[4] + " ft",
+                                        fart: f[5] + " kt",
+                                        avstand: kalkulerAvstand(tosLat, tosLon, f[1], f[2]),
+                                        rutenummer: (f[13] || "").replace(/\s+/g, '').toUpperCase(),
+                                        callsign: (f[16] || "").replace(/\s+/g, '').toUpperCase()
+                                    });
+                                }
+                            }
+                        } catch (e) {
+                            console.log("Feil ved parsing av radardata", e);
+                        }
+                    }
+                    // Uansett om Flightradar lykkes eller feiler (f.eks proxy-trøbbel), henter vi rutetider fra Avinor:
+                    oppdaterSkjermMedAvinor(radarListe);
+                }
+            };
+            xhrRadar.send();
+        }
+
+        hentFlyData();
+        setInterval(hentFlyData, 30000);
+    </script>
+</body>
+</html>
+"""
+    
+    html_content = html_content.replace("__CURRENT_DATE__", current_date)
+    html_content = html_content.replace("__WEATHER_SUMMARY__", weather["summary"])
+    html_content = html_content.replace("__WEATHER_TEMP__", weather["temp"])
+    html_content = html_content.replace("__WEATHER_WIND__", weather["wind"])
+    html_content = html_content.replace("__WEATHER_HUMIDITY__", weather["humidity"])
+
+    with open("time.html", "w", encoding="utf-8") as f:
+        f.write(html_content)
+    print("time.html ble generert suksessfullt!")
+
+if __name__ == "__main__":
+    generate_html()
