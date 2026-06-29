@@ -2,8 +2,8 @@ name: Update Dashboard Image
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # Kjører automatisk hvert 30. minutt
-  workflow_dispatch: # Gjør at du kan starte den manuelt når du vil
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -23,13 +23,13 @@ jobs:
 
     - name: Kjør skript med Tromsø-tid
       env:
-        TZ: 'Europe/Oslo' # Setter tidsone for hele kjøringen
+        TZ: 'Europe/Oslo'
       run: python app.py
 
-    - name: Commit og Push bildet back til GitHub
+    - name: Commit og Push HTML-filen back til GitHub
       run: |
         git config --global user.name 'Github Action'
         git config --global user.email 'action@github.com'
-        git add dashboard.png
-        git commit -m "Auto-oppdatert dashboard bilde" || true
+        git add index.html
+        git commit -m "Auto-oppdatert dashboard HTML" || true
         git push
