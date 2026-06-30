@@ -1,11 +1,21 @@
 import os
 import requests
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
+# Siden du har Pillow installert i workflowen din, bruker vi det til å sikre bildet
+try:
+    from PIL import Image, ImageDraw
+except ImportError:
+    pass
 
 LAT, LON = 69.6492, 18.9553  # Tromsø
 USER_AGENT = "NookDashboard/1.0 (+https://github.com/dinbruker)"
 TIMEZONE = ZoneInfo("Europe/Oslo")
+
+# Vi bruker den offisielle Avinor-feeden som du har i den andre workflowen din
+AVINOR_URL = "https://asrv.avinor.no/XmlFeed/v1.0?airport=TOS"
 
 def get_weather():
     headers = {'User-Agent': USER_AGENT}
@@ -27,10 +37,64 @@ def get_weather():
     except Exception as e:
         return {"temp": "--°", "wind": "- m/s", "humidity": "-%", "summary": "UKJENT VÆR"}
 
+def get_next_flight():
+    """Henter flydata direkte fra den offisielle Avinor-feeden og finner neste ankomst"""
+    try:
+        response = requests.get(AVINOR_URL, timeout=10)
+        response.raise_for_status()
+        
+        root = ET.fromstring(response.content)
+        flights = []
+        
+        for flight in root.findall('.//flight'):
+            arr_dep_node = flight.find('arr_dep')
+            if arr_dep_node is not None and arr_dep_node.text == 'A':
+                
+                flight_id_node = flight.find('flight_id')
+                airport_node = flight.find('airport')
+                sched_time_node = flight.find('schedule_time')
+                
+                if flight_id_node is not None and airport_node is not None and sched_time_node is not None:
+                    flights.append({
+                        "time_raw": sched_time_node.text,
+                        "id": flight_id_node.text,
+                        "origin": airport_node.text.upper()
+                    })
+        
+        if not flights:
+            return {"time": "--:--", "id": "Ingen fly funnet", "origin": "FRA: -", "raw_id": ""}
+            
+        # Sorter etter tid (tidligste først)
+        flights.sort(key=lambda x: x["time_raw"])
+        
+        # Filtrer ut fly som allerede har landet basert på nåtid i UTC
+        nå_utc = datetime.now(ZoneInfo("UTC"))
+        kommende_fly = []
+        for f in flights:
+            fly_tid = datetime.fromisoformat(f["time_raw"].replace('Z', '+00:00'))
+            if fly_tid > nå_utc:
+                kommende_fly.append(f)
+                
+        neste = kommende_fly[0] if kommende_fly else flights[0]
+        dt_lokal = datetime.fromisoformat(neste["time_raw"].replace('Z', '+00:00')).astimezone(TIMEZONE)
+        status_tid = dt_lokal.strftime("%H:%M")
+        
+        return {
+            "time": status_tid,
+            "id": f"FLIGHT: {neste['id']}",
+            "origin": f"FRA: {neste['origin']}",
+            "raw_id": neste['id']
+        }
+        
+    except Exception as e:
+        print(f"Feil ved parsing av Avinor XML: {e}")
+        return {"time": "--:--", "id": "Feil ved henting", "origin": "FRA: -", "raw_id": ""}
+
 def generate_html():
     now_local = datetime.now(TIMEZONE)
     current_date = now_local.strftime("%A, %B %d").upper()
     weather = get_weather()
+    flight = get_next_flight()
     
     html_content = """<!DOCTYPE html>
 <html lang="no">
@@ -172,10 +236,10 @@ def generate_html():
         <div class="column right-column">
             <h2 class="label-top">NESTE ANKOMST</h2>
             <h3 class="label-sub" id="flight-status-sub">TOS / ENTC</h3>
-            <div class="huge-data" id="flight-time">--:--</div>
-            <div class="detail-text" id="flight-id">Laster rutetider...</div>
-            <div class="detail-text" id="flight-origin">FRA: -</div>
-            <div class="detail-text" id="flight-radar" style="font-weight: bold; margin-top: 15px;">Venter...</div>
+            <div class="huge-data" id="flight-time">__FLIGHT_TIME__</div>
+            <div class="detail-text" id="flight-id">__FLIGHT_ID__</div>
+            <div class="detail-text" id="flight-origin">__FLIGHT_ORIGIN__</div>
+            <div class="detail-text" id="flight-radar" style="font-weight: bold; margin-top: 15px;">Sjekker radar...</div>
         </div>
     </div>
 
@@ -199,6 +263,7 @@ def generate_html():
 
         var tosLat = 69.683;
         var tosLon = 18.919;
+        var flynr = "__RAW_FLIGHT_ID__";
         var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=78.000,52.000,0.000,32.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
 
         function kalkulerAvstand(lat1, lon1, lat2, lon2) {
@@ -207,73 +272,15 @@ def generate_html():
             return Math.sqrt(x * x + y * y);
         }
 
-        function hentFlyData() {
-            logg("Henter Avinor XML...");
-            var xhrAvinor = new XMLHttpRequest();
-            // Bruker Math.random for trygg cachebusting på eldre enheter
-            xhrAvinor.open("GET", "flydata.xml?r=" + Math.random(), true);
-            xhrAvinor.onreadystatechange = function () {
-                if (xhrAvinor.readyState === 4) {
-                    if (xhrAvinor.status === 200) {
-                        try {
-                            var xmlDoc = new DOMParser().parseFromString(xhrAvinor.responseText, "application/xml");
-                            var flightNodes = xmlDoc.getElementsByTagName("flight");
-                            var ankomster = [];
-                            
-                            for (var i = 0; i < flightNodes.length; i++) {
-                                var node = flightNodes[i];
-                                var arrDep = node.getElementsByTagName("arr_dep")[0].textContent;
-                                if (arrDep === 'A') {
-                                    ankomster.push(node);
-                                }
-                            }
-                            
-                            // Gammeldags trygg sortering (ES5)
-                            ankomster.sort(function(a, b) {
-                                var tidA = new Date(a.getElementsByTagName("schedule_time")[0].textContent);
-                                var tidB = new Date(b.getElementsByTagName("schedule_time")[0].textContent);
-                                return tidA - tidB;
-                            });
-                            
-                            if (ankomster.length > 0) {
-                                var nesteFly = ankomster[0];
-                                var flynr = nesteFly.getElementsByTagName("flight_id")[0].textContent;
-                                var fraSted = nesteFly.getElementsByTagName("airport")[0].textContent;
-                                var tidRaw = nesteFly.getElementsByTagName("schedule_time")[0].textContent;
-                                
-                                var dato = new Date(tidRaw);
-                                var t = dato.getHours().toString();
-                                var m = dato.getMinutes().toString();
-                                if (t.length < 2) t = "0" + t;
-                                if (m.length < 2) m = "0" + m;
-                                
-                                document.getElementById("flight-time").innerText = t + ":" + m;
-                                document.getElementById("flight-id").innerText = "FLIGHT: " + flynr;
-                                document.getElementById("flight-origin").innerText = "FRA: " + fraSted.toUpperCase();
-                                document.getElementById("flight-status-sub").innerText = "TOS / ENTC";
-                                document.getElementById("flight-radar").innerText = "Sjekker radar...";
-                                
-                                // Avinor i boks, hent Flightradar i bakgrunnen
-                                sjekkRadar(flynr);
-                            } else {
-                                document.getElementById("flight-id").innerText = "Ingen ankomster funnet";
-                                document.getElementById("flight-radar").innerText = "-";
-                            }
-                        } catch (err) {
-                            logg("Feil i Avinor parsing: " + err.message);
-                        }
-                    } else {
-                        logg("Avinor fil mangler eller feilet (status: " + xhrAvinor.status + ")");
-                    }
-                }
-            };
-            xhrAvinor.send();
-        }
-
-        function sjekkRadar(flynr) {
-            logg("Sjekker Flightradar...");
+        function sjekkRadar() {
+            if (!flynr || flynr === "") {
+                document.getElementById("flight-radar").innerText = "Ingen data";
+                return;
+            }
+            
+            logg("Sjekker Flightradar for " + flynr + "...");
             var xhrRadar = new XMLHttpRequest();
-            xhrRadar.open("GET", radarUrl + "%26_=" + new Date().getTime(), true);
+            xhrRadar.open("GET", radarUrl + "%26_" + new Date().getTime(), true);
             xhrRadar.onreadystatechange = function () {
                 if (xhrRadar.readyState === 4) {
                     if (xhrRadar.status === 200) {
@@ -305,23 +312,23 @@ def generate_html():
                                 logg("Radar funnet!");
                             } else {
                                 document.getElementById("flight-radar").innerText = "Ikke i radarområdet ennå";
-                                logg("Fly ikke på kartet ennå");
+                                logg("Ikke på radarkart ennå");
                             }
                         } catch (e) {
-                            document.getElementById("flight-radar").innerText = "Radar utilgjengelig";
+                            document.getElementById("flight-radar").innerText = "Radarfeil";
                             logg("Feil i radar-parsing");
                         }
                     } else {
                         document.getElementById("flight-radar").innerText = "Radar utilgjengelig";
-                        logg("Proxy blokkert/feilet (status: " + xhrRadar.status + ")");
+                        logg("Proxy utilgjengelig (" + xhrRadar.status + ")");
                     }
                 }
             };
             xhrRadar.send();
         }
 
-        hentFlyData();
-        setInterval(hentFlyData, 30000);
+        sjekkRadar();
+        setInterval(sjekkRadar, 30000);
     </script>
 </body>
 </html>
@@ -332,10 +339,29 @@ def generate_html():
     html_content = html_content.replace("__WEATHER_TEMP__", weather["temp"])
     html_content = html_content.replace("__WEATHER_WIND__", weather["wind"])
     html_content = html_content.replace("__WEATHER_HUMIDITY__", weather["humidity"])
+    
+    html_content = html_content.replace("__FLIGHT_TIME__", flight["time"])
+    html_content = html_content.replace("__FLIGHT_ID__", flight["id"])
+    html_content = html_content.replace("__FLIGHT_ORIGIN__", flight["origin"])
+    html_content = html_content.replace("__RAW_FLIGHT_ID__", flight["raw_id"])
 
+    # Lagre den ferdige HTML-filen
     with open("time.html", "w", encoding="utf-8") as f:
         f.write(html_content)
-    print("time.html ble generert suksessfullt med ES5-kompatibilitet!")
+    print("time.html ble generert suksessfullt!")
+
+    # Hvis Pillow er installert, lager vi også en bildefil som fallback for e-blekk
+    try:
+        img = Image.new('RGB', (600, 800), color=(255, 255, 255))
+        d = ImageDraw.Draw(img)
+        # Tegner en enkel bekreftelse i bildefila
+        d.text((20, 20), f"Oppdatert: {now_local.strftime('%H:%M')}", fill=(0,0,0))
+        d.text((20, 50), f"Vaer: {weather['temp']} - {weather['summary']}", fill=(0,0,0))
+        d.text((20, 80), f"Neste fly: {flight['time']} -> {flight['id']}", fill=(0,0,0))
+        img.save("dashboard.png")
+        print("dashboard.png ble generert!")
+    except NameError:
+        pass
 
 if __name__ == "__main__":
     generate_html()
