@@ -66,17 +66,21 @@ def get_next_flights():
                 airport = flight.find('airport')
                 sched_time = flight.find('schedule_time')
                 
-                if flight_id is not None and airport_node is not None and sched_time is not None:
+                # FIKSET: Endret 'airport_node' til 'airport' på linjen under
+                if flight_id is not None and airport is not None and sched_time is not None:
                     flights.append({
                         "time_raw": sched_time.text,
                         "id": flight_id.text.strip(),
                         "origin": airport.text.upper().strip()
                     })
         
+        if not flights:
+            return []
+
         flights.sort(key=lambda x: x["time_raw"])
         
         nå_utc = datetime.now(ZoneInfo("UTC"))
-        grense_fortid = nå_utc - timedelta(minutes=30)
+        grense_fortid = nå_utc - timedelta(minutes=45) # Utvidet litt så vi er sikre på å fange opp fly som akkurat har landet
         
         kommende = [f for f in flights if datetime.fromisoformat(f["time_raw"].replace('Z', '+00:00')) > grense_fortid]
         if not kommende:
@@ -272,7 +276,6 @@ def generate_html():
             xhrRadar.send();
         }
 
-        // Tvinger en full sideoppdatering via JavaScript hvert 5. minutt (300000 ms) i tilfelle meta-taggen svikter
         setTimeout(function() {
             window.location.reload(true);
         }, 300000);
@@ -294,7 +297,7 @@ def generate_html():
 
     with open("time.html", "w", encoding="utf-8") as f:
         f.write(html_content)
-    print("time.html generert med automatisk sideoppdatering aktivert!")
+    print("time.html generert suksessfullt med rettede variabler!")
 
 if __name__ == "__main__":
     generate_html()
