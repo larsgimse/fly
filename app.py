@@ -14,6 +14,16 @@ USER_AGENT = "NookDashboard/1.0 (+https://github.com/dinbruker)"
 TIMEZONE = ZoneInfo("Europe/Oslo")
 AVINOR_URL = "https://asrv.avinor.no/XmlFeed/v1.0?airport=TOS"
 
+# En samling med stilrene, svarte/hvite SVG-ikoner som runder perfekt på e-blekk
+WEATHER_ICONS = {
+    "SUN": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:80px;height:80px;"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>""",
+    "CLOUD": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:80px;height:80px;"><path d="M17.5 19A3.5 3.5 0 0 0 21 15.5c0-2.79-2.54-4.5-5-4.5-.42-3.92-3.84-7-7.75-7A7.32 7.32 0 0 0 2 11.25c0 4.14 3.36 7.5 7.5 7.5h8"></path></svg>""",
+    "RAIN": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:80px;height:80px;"><path d="M16 13a4 4 0 0 0-8 0"></path><path d="M12 5v13M8 10v4M16 10v4"></path></svg>""",
+    "SNOW": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:80px;height:80px;"><path d="M12 2v20M17 5L7 19M19 17L5 7M22 12H2"></path></svg>""",
+    "THUNDER": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:80px;height:80px;"><path d="M19 10.93A7 7 0 0 0 5 11.25c0 4.14 3.36 7.5 7.5 7.5h1.75"></path><path d="m13 22 3-6h-5l3-6"></path></svg>""",
+    "FOG": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:80px;height:80px;"><path d="M5 8h14M3 12h18M5 16h14M7 20h10"></path></svg>"""
+}
+
 def get_weather():
     headers = {'User-Agent': USER_AGENT}
     url = f"https://api.met.no/weatherapi/locationforecast/2.0/compact?lat={LAT}&lon={LON}"
@@ -27,25 +37,38 @@ def get_weather():
         humidity = round(now['relative_humidity'])
         
         next_hour = data['properties']['timeseries'][0]['data'].get('next_1_hours', {})
-        summary = next_hour.get('summary', {}).get('symbol_code', 'unknown')
+        symbol_code = next_hour.get('summary', {}).get('symbol_code', 'unknown')
         
-        weather_text = summary.replace("_day", "").replace("_night", "").replace("_", " ").upper()
-        return {"temp": f"{temp}°", "wind": f"{wind} m/s", "humidity": f"{humidity}%", "summary": weather_text}
+        # Finn ut hvilket ikon som passer best basert på teksten fra Met.no
+        symbol_clean = symbol_code.lower()
+        if "thunder" in symbol_clean:
+            icon_svg = WEATHER_ICONS["THUNDER"]
+        elif "snow" in symbol_clean or "sleet" in symbol_clean:
+            icon_svg = WEATHER_ICONS["SNOW"]
+        elif "rain" in symbol_clean or "shower" in symbol_clean:
+            icon_svg = WEATHER_ICONS["RAIN"]
+        elif "fog" in symbol_clean:
+            icon_svg = WEATHER_ICONS["FOG"]
+        elif "clearsky" in symbol_clean or "fair" in symbol_clean:
+            icon_svg = WEATHER_ICONS["SUN"]
+        else:
+            icon_svg = WEATHER_ICONS["CLOUD"] # Default fallback
+            
+        weather_text = symbol_code.replace("_day", "").replace("_night", "").replace("_", " ").upper()
+        return {"temp": f"{temp}°", "wind": f"{wind} m/s", "humidity": f"{humidity}%", "summary": weather_text, "icon": icon_svg}
     except Exception as e:
-        return {"temp": "--°", "wind": "- m/s", "humidity": "-%", "summary": "UKJENT VÆR"}
+        return {"temp": "--°", "wind": "- m/s", "humidity": "-%", "summary": "UKJENT VÆR", "icon": WEATHER_ICONS["CLOUD"]}
 
 def get_next_flight():
     try:
         response = requests.get(AVINOR_URL, timeout=10)
         response.raise_for_status()
-        
         root = ET.fromstring(response.content)
         flights = []
         
         for flight in root.findall('.//flight'):
             arr_dep_node = flight.find('arr_dep')
             if arr_dep_node is not None and arr_dep_node.text == 'A':
-                
                 flight_id_node = flight.find('flight_id')
                 airport_node = flight.find('airport')
                 sched_time_node = flight.find('schedule_time')
@@ -62,8 +85,6 @@ def get_next_flight():
             
         flights.sort(key=lambda x: x["time_raw"])
         
-        # UTVIDET BUFFER: Vi tillater fly som skulle landet for inntil 2 timer siden,
-        # i tilfelle de er forsinket og er på radaren akkurat nå!
         nå_utc = datetime.now(ZoneInfo("UTC"))
         grense_fortid = nå_utc - timedelta(hours=2)
         
@@ -83,7 +104,6 @@ def get_next_flight():
             "origin": f"FRA: {neste['origin']}",
             "raw_id": neste['id']
         }
-        
     except Exception as e:
         print(f"Feil ved parsing av Avinor XML: {e}")
         return {"time": "--:--", "id": "Feil ved henting", "origin": "FRA: -", "raw_id": ""}
@@ -124,7 +144,8 @@ def generate_html():
         .left-column { padding-right: 20px; border-right: 1px solid #e0e0e0; }
         .right-column { padding-left: 30px; }
         .label-top { font-size: 16px; font-weight: 700; letter-spacing: 2px; margin: 0 0 5px 0; }
-        .label-sub { font-size: 14px; font-weight: 400; color: #777777; margin: 0 0 35px 0; letter-spacing: 1px; }
+        .label-sub { font-size: 14px; font-weight: 400; color: #777777; margin: 0 0 25px 0; letter-spacing: 1px; }
+        .weather-icon-container { margin: 10px 0 15px 0; height: 80px; }
         .huge-data { font-size: 75px; font-weight: 700; margin: 0 0 25px 0; line-height: 1; }
         .detail-text { font-size: 18px; font-weight: 400; margin: 8px 0; color: #222222; }
         .radar-live-badge { display: inline-block; background-color: #000000; color: #ffffff; font-size: 12px; padding: 2px 6px; font-weight: bold; margin-left: 10px; vertical-align: middle; }
@@ -144,6 +165,7 @@ def generate_html():
         <div class="column left-column">
             <h2 class="label-top">TROMSØ</h2>
             <h3 class="label-sub">__WEATHER_SUMMARY__</h3>
+            <div class="weather-icon-container">__WEATHER_ICON__</div>
             <div class="huge-data">__WEATHER_TEMP__</div>
             <div class="detail-text">VIND: __WEATHER_WIND__</div>
             <div class="detail-text">FUKTIGHET: __WEATHER_HUMIDITY__</div>
@@ -152,7 +174,7 @@ def generate_html():
         <div class="column right-column">
             <h2 class="label-top">NESTE ANKOMST</h2>
             <h3 class="label-sub" id="flight-status-sub">TOS / ENTC</h3>
-            <div class="huge-data" id="flight-time">__FLIGHT_TIME__</div>
+            <div style="height: 80px;"></div> <div class="huge-data" id="flight-time">__FLIGHT_TIME__</div>
             <div class="detail-text" id="flight-id">__FLIGHT_ID__</div>
             <div class="detail-text" id="flight-origin">__FLIGHT_ORIGIN__</div>
             <div class="detail-text" id="flight-radar" style="font-weight: bold; margin-top: 15px;">Sjekker radar...</div>
@@ -178,8 +200,6 @@ def generate_html():
         var tosLat = 69.683;
         var tosLon = 18.919;
         var flynr = "__RAW_FLIGHT_ID__".replace(/\s+/g, '').toUpperCase();
-        
-        // Henter et litt større område rundt Nord-Norge for å fange opp fly tidlig
         var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=72.000,65.000,10.000,30.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
 
         function kalkulerAvstand(lat1, lon1, lat2, lon2) {
@@ -202,8 +222,6 @@ def generate_html():
                     try {
                         var radarData = JSON.parse(xhrRadar.responseText);
                         var match = null;
-                        
-                        // Lager alternative skrivemåter for sjekk (eks: SK4410 -> SAS4410, WF123 -> WIF123)
                         var altSøk1 = flynr.replace("SK", "SAS").replace("WF", "WIF").replace("DY", "NAX").replace("D8", "IBK");
                         var altSøk2 = flynr.replace("SAS", "SK").replace("WIF", "WF").replace("NAX", "DY").replace("IBK", "D8");
 
@@ -213,7 +231,6 @@ def generate_html():
                                 var rutenummer = (f[13] || "").replace(/\s+/g, '').toUpperCase();
                                 var callsign = (f[16] || "").replace(/\s+/g, '').toUpperCase();
                                 
-                                // Aggressiv matching mot alle kjente ID-er fra flyet
                                 if (rutenummer === flynr || callsign === flynr || 
                                     rutenummer === altSøk1 || callsign === altSøk1 ||
                                     rutenummer === altSøk2 || callsign === altSøk2) {
@@ -246,7 +263,7 @@ def generate_html():
         }
 
         sjekkRadar();
-        setInterval(sjekkRadar, 30000); // Sjekker automatisk live på skjermen hvert 30. sekund
+        setInterval(sjekkRadar, 30000);
     </script>
 </body>
 </html>
@@ -257,6 +274,7 @@ def generate_html():
     html_content = html_content.replace("__WEATHER_TEMP__", weather["temp"])
     html_content = html_content.replace("__WEATHER_WIND__", weather["wind"])
     html_content = html_content.replace("__WEATHER_HUMIDITY__", weather["humidity"])
+    html_content = html_content.replace("__WEATHER_ICON__", weather["icon"])  # Limer inn det grafiske ikonet
     
     html_content = html_content.replace("__FLIGHT_TIME__", flight["time"])
     html_content = html_content.replace("__FLIGHT_ID__", flight["id"])
@@ -265,17 +283,7 @@ def generate_html():
 
     with open("time.html", "w", encoding="utf-8") as f:
         f.write(html_content)
-    print("time.html oppdatert med smart radarmatching!")
-
-    try:
-        img = Image.new('RGB', (600, 800), color=(255, 255, 255))
-        d = ImageDraw.Draw(img)
-        d.text((20, 20), f"Oppdatert: {now_local.strftime('%H:%M')}", fill=(0,0,0))
-        d.text((20, 50), f"Vaer: {weather['temp']} - {weather['summary']}", fill=(0,0,0))
-        d.text((20, 80), f"Neste fly: {flight['time']} -> {flight['id']}", fill=(0,0,0))
-        img.save("dashboard.png")
-    except NameError:
-        pass
+    print("time.html oppdatert med stilrene vaer-ikoner!")
 
 if __name__ == "__main__":
     generate_html()
