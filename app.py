@@ -112,8 +112,6 @@ def get_next_flights():
         for flight in root.findall('.//flight'):
             arr_dep_node = flight.find('arr_dep')
             if arr_dep_node is not None and arr_dep_node.text == 'A':
-                
-                # Sjekk status – hvis flyet allerede har status "A" (Arrived/Landet), hopper vi over det
                 status_node = flight.find('.//status')
                 if status_node is not None and status_node.get('code') == 'A':
                     continue
@@ -124,8 +122,6 @@ def get_next_flights():
                 
                 if flight_id is not None and airport is not None and sched_time is not None:
                     flight_tid_utc = datetime.fromisoformat(sched_time.text.replace('Z', '+00:00'))
-                    
-                    # STRENG FILTER: Vi tar BARE med fly som har rutetid i fremtiden (pluss maks 5 minutter forsinkelse på kartet)
                     if flight_tid_utc >= (nå_utc - timedelta(minutes=5)):
                         flights.append({
                             "time_raw": sched_time.text,
@@ -136,7 +132,6 @@ def get_next_flights():
         if not flights:
             return []
 
-        # Sorterer slik at det som har rutetid aller nærmest nå (i fremtiden) kommer først
         flights.sort(key=lambda x: x["time_raw"])
                     
         js_flights = []
@@ -161,15 +156,16 @@ def generate_html():
     import json
     flights_json = json.dumps(flights_list)
     
-    forecast_html = '<table style="width: 100%; margin-top: 30px; font-size: 18px; border-collapse: collapse;">'
+    # OPPDATERT: Gjort 5-dagersvarselet til en liggende tabell (kolonner i stedet for rader) så det passer nederst
+    forecast_html = '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;"><tr>'
     for f in weather["forecast"]:
         forecast_html += f"""
-        <tr style="height: 35px;">
-            <td style="font-weight: 700; width: 35%;">{f['dag']}</td>
-            <td style="font-size: 24px; width: 35%; text-align: center; line-height: 1;">{f['icon']}</td>
-            <td style="text-align: right; width: 30%;">{f['temp']}</td>
-        </tr>"""
-    forecast_html += '</table>'
+        <td style="text-align: center; width: 20%; padding: 5px 0;">
+            <div style="font-weight: 700; font-size: 14px; color: #555555; margin-bottom: 2px;">{f['dag']}</div>
+            <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">{f['icon']}</div>
+            <div style="font-size: 16px; font-weight: 700;">{f['temp']}</div>
+        </td>"""
+    forecast_html += '</tr></table>'
     
     html_content = """<!DOCTYPE html>
 <html lang="no">
@@ -189,7 +185,7 @@ def generate_html():
             background-color: #ffffff;
             color: #000000;
             margin: 0;
-            padding: 40px 20px;
+            padding: 30px 20px 10px 20px;
             width: 600px;
             height: 800px;
             box-sizing: border-box;
@@ -197,21 +193,29 @@ def generate_html():
             flex-direction: column;
             justify-content: space-between;
         }
-        .top-section { text-align: center; margin-top: 20px; }
+        .top-section { text-align: center; margin-top: 10px; }
         .clock { font-size: 110px; font-weight: 700; letter-spacing: -2px; margin: 0; line-height: 1; }
         .date { font-size: 22px; font-weight: 400; color: #555555; margin-top: 15px; letter-spacing: 1px; }
-        .divider { border-top: 1px solid #e0e0e0; width: 85%; margin: 40px auto; }
-        .bottom-section { display: flex; flex: 1; padding: 0 20px; }
+        .divider { border-top: 1px solid #e0e0e0; width: 85%; margin: 25px auto; }
+        
+        /* Midtseksjon som holder de to kolonnene */
+        .mid-section { display: flex; height: 380px; padding: 0 20px; }
         .column { flex: 1; display: flex; flex-direction: column; }
         .left-column { padding-right: 20px; border-right: 1px solid #e0e0e0; }
         .right-column { padding-left: 30px; }
+        
         .label-top { font-size: 16px; font-weight: 700; letter-spacing: 2px; margin: 0 0 5px 0; }
         .label-sub { font-size: 14px; font-weight: 400; color: #777777; margin: 0 0 10px 0; letter-spacing: 1px; }
-        .weather-icon { font-size: 65px; margin: 10px 0; line-height: 1; }
-        .huge-data { font-size: 75px; font-weight: 700; margin: 0 0 25px 0; line-height: 1; }
-        .detail-text { font-size: 18px; font-weight: 400; margin: 8px 0; color: #222222; }
+        .weather-icon { font-size: 65px; margin: 5px 0; line-height: 1; }
+        .huge-data { font-size: 75px; font-weight: 700; margin: 0 0 15px 0; line-height: 1; }
+        .detail-text { font-size: 18px; font-weight: 400; margin: 6px 0; color: #222222; }
         .radar-live-badge { display: inline-block; background-color: #000000; color: #ffffff; font-size: 12px; padding: 2px 6px; font-weight: bold; margin-left: 10px; vertical-align: middle; }
-        #debug-log { font-size: 10px; color: #aaaaaa; text-align: center; margin-top: 10px; font-family: monospace; }
+        
+        /* Bunndivider og bunnseksjon for 5-dagersvarselet */
+        .bottom-divider { border-top: 1px solid #e0e0e0; width: 85%; margin: 25px auto 15px auto; }
+        .forecast-section { padding: 0 20px 10px 20px; }
+        
+        #debug-log { font-size: 10px; color: #aaaaaa; text-align: center; margin-top: 5px; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -223,7 +227,7 @@ def generate_html():
     
     <div class="divider"></div>
     
-    <div class="bottom-section">
+    <div class="mid-section">
         <div class="column left-column">
             <h2 class="label-top">TROMSØ</h2>
             <h3 class="label-sub">__WEATHER_SUMMARY__</h3>
@@ -231,18 +235,24 @@ def generate_html():
             <div class="huge-data">__WEATHER_TEMP__</div>
             <div class="detail-text">VIND: __WEATHER_WIND__</div>
             <div class="detail-text">FUKT: __WEATHER_HUMIDITY__</div>
-            __WEATHER_FORECAST__
         </div>
         
         <div class="column right-column">
             <h2 class="label-top">NESTE ANKOMST</h2>
             <h3 class="label-sub" id="flight-status-sub">TOS / ENTC</h3>
-            <div style="height: 75px;"></div>
+            <div style="height: 45px;"></div>
             <div class="huge-data" id="flight-time">--:--</div>
             <div class="detail-text" id="flight-id">Laster rutetider...</div>
             <div class="detail-text" id="flight-origin">FRA: -</div>
             <div class="detail-text" id="flight-radar" style="font-weight: bold; margin-top: 15px;">Sjekker radar...</div>
         </div>
+    </div>
+
+    <div class="bottom-divider"></div>
+
+    <div class="forecast-section">
+        <h2 class="label-top" style="font-size: 13px; text-align: center; margin-bottom: 10px; color: #555555;">5-DAGERSVARSEL</h2>
+        __WEATHER_FORECAST__
     </div>
 
     <div id="debug-log">System OK</div>
@@ -367,7 +377,7 @@ def generate_html():
 
     with open("time.html", "w", encoding="utf-8") as f:
         f.write(html_content)
-    print("time.html lagret med streng tidsfiltrering!")
+    print("time.html oppdatert med liggende rad for 5-dagersvarselet!")
 
 if __name__ == "__main__":
     generate_html()
