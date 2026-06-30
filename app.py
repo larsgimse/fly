@@ -54,7 +54,8 @@ def get_weather():
         weather_text = symbol_code.replace("_day", "").replace("_night", "").replace("_", " ").upper()
         
         forecast_list = []
-        dag_navn_mapping = {0: "MAN", 1: "TIR", 2: "ONS", 3: "TOR", 4: FRE", 5: "LØR", 6: "SØN"}
+        # FIKSET: Lagt til det manglende hermetegnet rundt "FRE" her under
+        dag_navn_mapping = {0: "MAN", 1: "TIR", 2: "ONS", 3: "TOR", 4: "FRE", 5: "LØR", 6: "SØN"}
         
         idag_dato = datetime.now(TIMEZONE).date()
         mål_dager = [idag_dato + timedelta(days=i) for i in range(1, 6)]
@@ -338,11 +339,10 @@ def generate_html():
             xhrRadar.send();
         }
 
-        // 2. SMART REFRESH: Legger på et unikt tidsstempel så nettleseren må hente ny kode fra serveren
         setTimeout(function() {
             var gjeldendeUrl = window.location.href.split('?')[0];
             window.location.href = gjeldendeUrl + "?oppdatert=" + new Date().getTime();
-        }, 300000); // 5 minutter
+        }, 300000);
 
         sjekkRadarOgOppdater();
         setInterval(sjekkRadarOgOppdater, 30000);
@@ -362,7 +362,7 @@ def generate_html():
 
     with open("time.html", "w", encoding="utf-8") as f:
         f.write(html_content)
-    print("time.html lagret med tvungen tømming av cache!")
+    print("time.html lagret og feilrettet suksessfullt!")
 
 if __name__ == "__main__":
     generate_html()
