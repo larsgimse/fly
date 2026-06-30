@@ -141,6 +141,14 @@ def generate_html():
             margin-left: 10px;
             vertical-align: middle;
         }
+        
+        #debug-log {
+            font-size: 10px;
+            color: #aaaaaa;
+            text-align: center;
+            margin-top: 10px;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
@@ -165,17 +173,26 @@ def generate_html():
             <h2 class="label-top">NESTE ANKOMST</h2>
             <h3 class="label-sub" id="flight-status-sub">TOS / ENTC</h3>
             <div class="huge-data" id="flight-time">--:--</div>
-            <div class="detail-text" id="flight-id">Henter flytider...</div>
+            <div class="detail-text" id="flight-id">Laster rutetider...</div>
             <div class="detail-text" id="flight-origin">FRA: -</div>
-            <div class="detail-text" id="flight-radar" style="font-weight: bold; margin-top: 15px;">-</div>
+            <div class="detail-text" id="flight-radar" style="font-weight: bold; margin-top: 15px;">Venter...</div>
         </div>
     </div>
 
+    <div id="debug-log">System OK</div>
+
     <script>
+        function logg(tekst) {
+            document.getElementById("debug-log").innerText = tekst;
+        }
+
         function updateClock() {
-            const now = new Date();
-            const options = { timeZone: 'Europe/Oslo', hour: '2-digit', minute: '2-digit', hour12: false };
-            document.getElementById('live-clock').innerText = now.toLocaleTimeString('no-NO', options);
+            var now = new Date();
+            var timer = now.getHours().toString();
+            var minutter = now.getMinutes().toString();
+            if (timer.length < 2) timer = "0" + timer;
+            if (minutter.length < 2) minutter = "0" + minutter;
+            document.getElementById('live-clock').innerText = timer + ":" + minutter;
         }
         setInterval(updateClock, 1000);
         updateClock();
@@ -185,86 +202,122 @@ def generate_html():
         var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=78.000,52.000,0.000,32.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
 
         function kalkulerAvstand(lat1, lon1, lat2, lon2) {
-            var x = (lon2 - lon1) * Math.cos((lat1 + lat2) / 2 * Math.PI / 180) * 111.32;
+            var x = (lon2 - lon1) * Math.cos((lat1 + lat2) / 2 * 3.14159265 / 180) * 111.32;
             var y = (lat2 - lat1) * 111.13;
             return Math.sqrt(x * x + y * y);
         }
 
         function hentFlyData() {
-            // Trinn 1: Hent ALLTID Avinor rutetider først så skjermen ikke blir blank
+            logg("Henter Avinor XML...");
             var xhrAvinor = new XMLHttpRequest();
-            xhrAvinor.open("GET", "flydata.xml?cachebuster=" + new Date().getTime(), true);
+            // Bruker Math.random for trygg cachebusting på eldre enheter
+            xhrAvinor.open("GET", "flydata.xml?r=" + Math.random(), true);
             xhrAvinor.onreadystatechange = function () {
-                if (xhrAvinor.readyState === 4 && xhrAvinor.status === 200) {
-                    var xmlDoc = new DOMParser().parseFromString(xhrAvinor.responseText, "application/xml");
-                    var flights = Array.from(xmlDoc.getElementsByTagName("flight"));
-                    
-                    var ankomster = flights.filter(f => f.getElementsByTagName("arr_dep")[0].textContent === 'A')
-                        .sort((a,b) => new Date(a.getElementsByTagName("schedule_time")[0].textContent) - new Date(b.getElementsByTagName("schedule_time")[0].textContent));
-                    
-                    if (ankomster.length > 0) {
-                        var nesteFly = ankomster[0];
-                        var flynr = nesteFly.getElementsByTagName("flight_id")[0].textContent;
-                        var fraSted = nesteFly.getElementsByTagName("airport")[0].textContent;
-                        var tidRaw = nesteFly.getElementsByTagName("schedule_time")[0].textContent;
-                        
-                        var dato = new Date(tidRaw);
-                        var t = dato.getHours().toString().padStart(2, '0');
-                        var m = dato.getMinutes().toString().padStart(2, '0');
-                        
-                        document.getElementById("flight-time").innerText = t + ":" + m;
-                        document.getElementById("flight-id").innerText = "FLIGHT: " + flynr;
-                        document.getElementById("flight-origin").innerText = "FRA: " + fraSted.toUpperCase();
-                        document.getElementById("flight-status-sub").innerText = "TOS / ENTC";
-                        document.getElementById("flight-radar").innerText = "Sjekker live radar...";
-
-                        // Trinn 2: Nå som rutetiden er synlig, prøv å hente Flightradar i bakgrunnen
-                        var xhrRadar = new XMLHttpRequest();
-                        xhrRadar.open("GET", radarUrl + "%26_" + new Date().getTime(), true);
-                        xhrRadar.onreadystatechange = function () {
-                            if (xhrRadar.readyState === 4 && xhrRadar.status === 200) {
-                                try {
-                                    var radarData = JSON.parse(xhrRadar.responseText);
-                                    var match = null;
-                                    var idSøk = flynr.replace(/\s+/g, '').toUpperCase();
-                                    
-                                    for (var nøkkel in radarData) {
-                                        if (nøkkel !== "full_count" && nøkkel !== "version" && nøkkel !== "stats") {
-                                            var f = radarData[nøkkel];
-                                            var rutenummer = (f[13] || "").replace(/\s+/g, '').toUpperCase();
-                                            var callsign = (f[16] || "").replace(/\s+/g, '').toUpperCase();
-                                            
-                                            if (rutenummer === idSøk || callsign === idSøk.replace("SK", "SAS").replace("WF", "WIF").replace("DY", "NAX")) {
-                                                match = {
-                                                    høyde: f[4] === 0 ? "Bakken" : f[4] + " ft",
-                                                    fart: f[5] + " kt",
-                                                    avstand: kalkulerAvstand(tosLat, tosLon, f[1], f[2])
-                                                };
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    
-                                    if (match) {
-                                        document.getElementById("flight-status-sub").innerHTML = "TOS / ENTC <span class='radar-live-badge'>RADAR LIVE</span>";
-                                        document.getElementById("flight-radar").innerHTML = match.avstand.toFixed(0) + " km unna<br>" + match.høyde + " / " + match.fart;
-                                    } else {
-                                        document.getElementById("flight-radar").innerText = "Ikke i radarområdet ennå";
-                                    }
-                                } catch (e) {
-                                    document.getElementById("flight-radar").innerText = "Radar utilgjengelig";
+                if (xhrAvinor.readyState === 4) {
+                    if (xhrAvinor.status === 200) {
+                        try {
+                            var xmlDoc = new DOMParser().parseFromString(xhrAvinor.responseText, "application/xml");
+                            var flightNodes = xmlDoc.getElementsByTagName("flight");
+                            var ankomster = [];
+                            
+                            for (var i = 0; i < flightNodes.length; i++) {
+                                var node = flightNodes[i];
+                                var arrDep = node.getElementsByTagName("arr_dep")[0].textContent;
+                                if (arrDep === 'A') {
+                                    ankomster.push(node);
                                 }
                             }
-                        };
-                        xhrRadar.send();
-
+                            
+                            // Gammeldags trygg sortering (ES5)
+                            ankomster.sort(function(a, b) {
+                                var tidA = new Date(a.getElementsByTagName("schedule_time")[0].textContent);
+                                var tidB = new Date(b.getElementsByTagName("schedule_time")[0].textContent);
+                                return tidA - tidB;
+                            });
+                            
+                            if (ankomster.length > 0) {
+                                var nesteFly = ankomster[0];
+                                var flynr = nesteFly.getElementsByTagName("flight_id")[0].textContent;
+                                var fraSted = nesteFly.getElementsByTagName("airport")[0].textContent;
+                                var tidRaw = nesteFly.getElementsByTagName("schedule_time")[0].textContent;
+                                
+                                var dato = new Date(tidRaw);
+                                var t = dato.getHours().toString();
+                                var m = dato.getMinutes().toString();
+                                if (t.length < 2) t = "0" + t;
+                                if (m.length < 2) m = "0" + m;
+                                
+                                document.getElementById("flight-time").innerText = t + ":" + m;
+                                document.getElementById("flight-id").innerText = "FLIGHT: " + flynr;
+                                document.getElementById("flight-origin").innerText = "FRA: " + fraSted.toUpperCase();
+                                document.getElementById("flight-status-sub").innerText = "TOS / ENTC";
+                                document.getElementById("flight-radar").innerText = "Sjekker radar...";
+                                
+                                // Avinor i boks, hent Flightradar i bakgrunnen
+                                sjekkRadar(flynr);
+                            } else {
+                                document.getElementById("flight-id").innerText = "Ingen ankomster funnet";
+                                document.getElementById("flight-radar").innerText = "-";
+                            }
+                        } catch (err) {
+                            logg("Feil i Avinor parsing: " + err.message);
+                        }
                     } else {
-                        document.getElementById("flight-id").innerText = "Ingen planlagte ankomster";
-                        document.getElementById("flight-radar").innerText = "-";
+                        logg("Avinor fil mangler eller feilet (status: " + xhrAvinor.status + ")");
                     }
                 }
             };
             xhrAvinor.send();
+        }
+
+        function sjekkRadar(flynr) {
+            logg("Sjekker Flightradar...");
+            var xhrRadar = new XMLHttpRequest();
+            xhrRadar.open("GET", radarUrl + "%26_=" + new Date().getTime(), true);
+            xhrRadar.onreadystatechange = function () {
+                if (xhrRadar.readyState === 4) {
+                    if (xhrRadar.status === 200) {
+                        try {
+                            var radarData = JSON.parse(xhrRadar.responseText);
+                            var match = null;
+                            var idSøk = flynr.replace(/\s+/g, '').toUpperCase();
+                            
+                            for (var nøkkel in radarData) {
+                                if (nøkkel !== "full_count" && nøkkel !== "version" && nøkkel !== "stats") {
+                                    var f = radarData[nøkkel];
+                                    var rutenummer = (f[13] || "").replace(/\s+/g, '').toUpperCase();
+                                    var callsign = (f[16] || "").replace(/\s+/g, '').toUpperCase();
+                                    
+                                    if (rutenummer === idSøk || callsign === idSøk.replace("SK", "SAS").replace("WF", "WIF").replace("DY", "NAX")) {
+                                        match = {
+                                            høyde: f[4] === 0 ? "Bakken" : f[4] + " ft",
+                                            fart: f[5] + " kt",
+                                            avstand: kalkulerAvstand(tosLat, tosLon, f[1], f[2])
+                                        };
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            if (match) {
+                                document.getElementById("flight-status-sub").innerHTML = "TOS / ENTC <span class='radar-live-badge'>RADAR LIVE</span>";
+                                document.getElementById("flight-radar").innerHTML = match.avstand.toFixed(0) + " km unna<br>" + match.høyde + " / " + match.fart;
+                                logg("Radar funnet!");
+                            } else {
+                                document.getElementById("flight-radar").innerText = "Ikke i radarområdet ennå";
+                                logg("Fly ikke på kartet ennå");
+                            }
+                        } catch (e) {
+                            document.getElementById("flight-radar").innerText = "Radar utilgjengelig";
+                            logg("Feil i radar-parsing");
+                        }
+                    } else {
+                        document.getElementById("flight-radar").innerText = "Radar utilgjengelig";
+                        logg("Proxy blokkert/feilet (status: " + xhrRadar.status + ")");
+                    }
+                }
+            };
+            xhrRadar.send();
         }
 
         hentFlyData();
@@ -282,7 +335,7 @@ def generate_html():
 
     with open("time.html", "w", encoding="utf-8") as f:
         f.write(html_content)
-    print("time.html ble generert suksessfullt med prioritert rekkefølge!")
+    print("time.html ble generert suksessfullt med ES5-kompatibilitet!")
 
 if __name__ == "__main__":
     generate_html()
