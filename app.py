@@ -42,7 +42,6 @@ def get_weather():
         response.raise_for_status()
         data = response.json()
         
-        # 1. Dagens vær (Nåtid)
         timeseries = data['properties']['timeseries']
         now = timeseries[0]['data']['instant']['details']
         temp = round(now['air_temperature'])
@@ -54,26 +53,20 @@ def get_weather():
         icon = get_unicode_icon(symbol_code)
         weather_text = symbol_code.replace("_day", "").replace("_night", "").replace("_", " ").upper()
         
-        # 2. 5-dagers varsel (Søk etter kl 12:00 for de neste dagene)
         forecast_list = []
-        dag_navn_mapping = {0: "MAN", 1: "TIR", 2: "ONS", 3: "TOR", 4: "FRE", 5: "LØR", 6: "SØN"}
+        dag_navn_mapping = {0: "MAN", 1: "TIR", 2: "ONS", 3: "TOR", 4: FRE", 5: "LØR", 6: "SØN"}
         
-        # Vi vil finne 5 unike dager frem i tid
         idag_dato = datetime.now(TIMEZONE).date()
         mål_dager = [idag_dato + timedelta(days=i) for i in range(1, 6)]
         
         for mål_dato in mål_dager:
             funnet_match = False
             for entry in timeseries:
-                # Gjør om ISO-tid til lokal dato
                 entry_tid = datetime.fromisoformat(entry['time'].replace('Z', '+00:00')).astimezone(TIMEZONE)
-                
-                # Vi prøver å treffe rundt midt på dagen (kl 12:00 eller 13:00 avhengig av intervallene i JSON)
                 if entry_tid.date() == mål_dato and entry_tid.hour in [12, 13, 14]:
                     details = entry['data']['instant']['details']
                     f_temp = round(details['air_temperature'])
                     
-                    # Hent symbol (fra neste 6 eller 1 timer avhengig av hva som finnes i dataene)
                     f_symbol = "unknown"
                     if 'next_6_hours' in entry['data']:
                         f_symbol = entry['data']['next_6_hours'].get('summary', {}).get('symbol_code', 'unknown')
@@ -91,7 +84,6 @@ def get_weather():
                     funnet_match = True
                     break
             
-            # Fallback hvis data mangler akkurat for det tidspunktet
             if not funnet_match:
                 forecast_list.append({"dag": dag_navn_mapping[mål_dato.weekday()], "icon": "☁️", "temp": "--°"})
 
@@ -163,7 +155,6 @@ def generate_html():
     import json
     flights_json = json.dumps(flights_list)
     
-    # Bygg HTML-kode for 5-dagersvarselet som en ren og ryddig tabell
     forecast_html = '<table style="width: 100%; margin-top: 30px; font-size: 18px; border-collapse: collapse;">'
     for f in weather["forecast"]:
         forecast_html += f"""
@@ -179,7 +170,11 @@ def generate_html():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="300">
+    
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
     <title>Nook Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
@@ -230,7 +225,6 @@ def generate_html():
             <div class="huge-data">__WEATHER_TEMP__</div>
             <div class="detail-text">VIND: __WEATHER_WIND__</div>
             <div class="detail-text">FUKT: __WEATHER_HUMIDITY__</div>
-            
             __WEATHER_FORECAST__
         </div>
         
@@ -344,9 +338,11 @@ def generate_html():
             xhrRadar.send();
         }
 
+        // 2. SMART REFRESH: Legger på et unikt tidsstempel så nettleseren må hente ny kode fra serveren
         setTimeout(function() {
-            window.location.reload(true);
-        }, 300000);
+            var gjeldendeUrl = window.location.href.split('?')[0];
+            window.location.href = gjeldendeUrl + "?oppdatert=" + new Date().getTime();
+        }, 300000); // 5 minutter
 
         sjekkRadarOgOppdater();
         setInterval(sjekkRadarOgOppdater, 30000);
@@ -361,12 +357,12 @@ def generate_html():
     html_content = html_content.replace("__WEATHER_WIND__", weather["wind"])
     html_content = html_content.replace("__WEATHER_HUMIDITY__", weather["humidity"])
     html_content = html_content.replace("__WEATHER_ICON__", weather["icon"]) 
-    html_content = html_content.replace("__WEATHER_FORECAST__", forecast_html)  # Setter inn 5-dagers tabellen
+    html_content = html_content.replace("__WEATHER_FORECAST__", forecast_html)
     html_content = html_content.replace("__FLIGHTS_JSON__", flights_json)
 
     with open("time.html", "w", encoding="utf-8") as f:
         f.write(html_content)
-    print("time.html oppdatert med 5-dagers værvarsel!")
+    print("time.html lagret med tvungen tømming av cache!")
 
 if __name__ == "__main__":
     generate_html()
