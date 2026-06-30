@@ -28,7 +28,8 @@
         .left-column { padding-right: 20px; border-right: 1px solid #e0e0e0; }
         .right-column { padding-left: 30px; }
         .label-top { font-size: 16px; font-weight: 700; letter-spacing: 2px; margin: 0 0 5px 0; }
-        .label-sub { font-size: 14px; font-weight: 400; color: #777777; margin: 0 0 35px 0; letter-spacing: 1px; }
+        .label-sub { font-size: 14px; font-weight: 400; color: #777777; margin: 0 0 25px 0; letter-spacing: 1px; }
+        .weather-icon-container { margin: 10px 0 15px 0; height: 80px; }
         .huge-data { font-size: 75px; font-weight: 700; margin: 0 0 25px 0; line-height: 1; }
         .detail-text { font-size: 18px; font-weight: 400; margin: 8px 0; color: #222222; }
         .radar-live-badge { display: inline-block; background-color: #000000; color: #ffffff; font-size: 12px; padding: 2px 6px; font-weight: bold; margin-left: 10px; vertical-align: middle; }
@@ -48,6 +49,7 @@
         <div class="column left-column">
             <h2 class="label-top">TROMSØ</h2>
             <h3 class="label-sub">RAIN</h3>
+            <div class="weather-icon-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:80px;height:80px;"><path d="M16 13a4 4 0 0 0-8 0"></path><path d="M12 5v13M8 10v4M16 10v4"></path></svg></div>
             <div class="huge-data">11°</div>
             <div class="detail-text">VIND: 6 m/s</div>
             <div class="detail-text">FUKTIGHET: 98%</div>
@@ -56,7 +58,7 @@
         <div class="column right-column">
             <h2 class="label-top">NESTE ANKOMST</h2>
             <h3 class="label-sub" id="flight-status-sub">TOS / ENTC</h3>
-            <div class="huge-data" id="flight-time">09:50</div>
+            <div style="height: 80px;"></div> <div class="huge-data" id="flight-time">09:50</div>
             <div class="detail-text" id="flight-id">FLIGHT: WF844</div>
             <div class="detail-text" id="flight-origin">FRA: BOO</div>
             <div class="detail-text" id="flight-radar" style="font-weight: bold; margin-top: 15px;">Sjekker radar...</div>
@@ -82,8 +84,6 @@
         var tosLat = 69.683;
         var tosLon = 18.919;
         var flynr = "WF844".replace(/\s+/g, '').toUpperCase();
-        
-        // Henter et litt større område rundt Nord-Norge for å fange opp fly tidlig
         var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=72.000,65.000,10.000,30.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
 
         function kalkulerAvstand(lat1, lon1, lat2, lon2) {
@@ -106,8 +106,6 @@
                     try {
                         var radarData = JSON.parse(xhrRadar.responseText);
                         var match = null;
-                        
-                        // Lager alternative skrivemåter for sjekk (eks: SK4410 -> SAS4410, WF123 -> WIF123)
                         var altSøk1 = flynr.replace("SK", "SAS").replace("WF", "WIF").replace("DY", "NAX").replace("D8", "IBK");
                         var altSøk2 = flynr.replace("SAS", "SK").replace("WIF", "WF").replace("NAX", "DY").replace("IBK", "D8");
 
@@ -117,7 +115,6 @@
                                 var rutenummer = (f[13] || "").replace(/\s+/g, '').toUpperCase();
                                 var callsign = (f[16] || "").replace(/\s+/g, '').toUpperCase();
                                 
-                                // Aggressiv matching mot alle kjente ID-er fra flyet
                                 if (rutenummer === flynr || callsign === flynr || 
                                     rutenummer === altSøk1 || callsign === altSøk1 ||
                                     rutenummer === altSøk2 || callsign === altSøk2) {
@@ -150,7 +147,7 @@
         }
 
         sjekkRadar();
-        setInterval(sjekkRadar, 30000); // Sjekker automatisk live på skjermen hvert 30. sekund
+        setInterval(sjekkRadar, 30000);
     </script>
 </body>
 </html>
