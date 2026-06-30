@@ -16,7 +16,7 @@
             background-color: #ffffff;
             color: #000000;
             margin: 0;
-            padding: 30px 20px 10px 20px;
+            padding: 40px 20px;
             width: 600px;
             height: 800px;
             box-sizing: border-box;
@@ -24,32 +24,21 @@
             flex-direction: column;
             justify-content: space-between;
         }
-        .top-section { text-align: center; margin-top: 10px; }
+        .top-section { text-align: center; margin-top: 20px; }
         .clock { font-size: 110px; font-weight: 700; letter-spacing: -2px; margin: 0; line-height: 1; }
         .date { font-size: 22px; font-weight: 400; color: #555555; margin-top: 15px; letter-spacing: 1px; }
-        
-        .divider { border-top: 1px solid #e0e0e0; width: 90%; margin: 25px auto; }
-        
-        .middle-section { display: flex; height: 380px; padding: 0 10px; }
+        .divider { border-top: 1px solid #e0e0e0; width: 85%; margin: 40px auto; }
+        .bottom-section { display: flex; flex: 1; padding: 0 20px; }
         .column { flex: 1; display: flex; flex-direction: column; }
         .left-column { padding-right: 20px; border-right: 1px solid #e0e0e0; }
-        .right-column { padding-left: 20px; }
-        
+        .right-column { padding-left: 30px; }
         .label-top { font-size: 16px; font-weight: 700; letter-spacing: 2px; margin: 0 0 5px 0; }
         .label-sub { font-size: 14px; font-weight: 400; color: #777777; margin: 0 0 10px 0; letter-spacing: 1px; }
-        .weather-icon { font-size: 65px; margin: 5px 0; line-height: 1; }
-        .huge-data { font-size: 75px; font-weight: 700; margin: 0 0 15px 0; line-height: 1; }
+        .weather-icon { font-size: 65px; margin: 10px 0; line-height: 1; }
+        .huge-data { font-size: 75px; font-weight: 700; margin: 0 0 25px 0; line-height: 1; }
         .detail-text { font-size: 18px; font-weight: 400; margin: 8px 0; color: #222222; }
         .radar-live-badge { display: inline-block; background-color: #000000; color: #ffffff; font-size: 12px; padding: 2px 6px; font-weight: bold; margin-left: 10px; vertical-align: middle; }
-        
-        /* NYTT: Stil for det horisontale 5-dagersvarselet i bunnen */
-        .forecast-container { display: flex; justify-content: space-between; width: 90%; margin: 10px auto; padding-bottom: 10px; }
-        .forecast-day { flex: 1; text-align: center; }
-        .forecast-dayname { font-size: 14px; font-weight: 700; color: #000000; margin-bottom: 5px; }
-        .forecast-icon { font-size: 28px; line-height: 1; margin-bottom: 5px; }
-        .forecast-temp { font-size: 16px; font-weight: 400; }
-        
-        #debug-log { font-size: 10px; color: #aaaaaa; text-align: center; margin-top: 5px; font-family: monospace; }
+        #debug-log { font-size: 10px; color: #aaaaaa; text-align: center; margin-top: 10px; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -61,14 +50,40 @@
     
     <div class="divider"></div>
     
-    <div class="middle-section">
+    <div class="bottom-section">
         <div class="column left-column">
             <h2 class="label-top">TROMSØ</h2>
-            <h3 class="label-sub">CLOUDY</h3>
-            <div class="weather-icon">☁️</div>
+            <h3 class="label-sub">RAIN</h3>
+            <div class="weather-icon">🌧️</div>
             <div class="huge-data">12°</div>
             <div class="detail-text">VIND: 6 m/s</div>
-            <div class="detail-text">FUKT: 87%</div>
+            <div class="detail-text">FUKT: 85%</div>
+            <table style="width: 100%; margin-top: 30px; font-size: 18px; border-collapse: collapse;">
+        <tr style="height: 35px;">
+            <td style="font-weight: 700; width: 35%;">ONS</td>
+            <td style="font-size: 24px; width: 35%; text-align: center; line-height: 1;">☁️</td>
+            <td style="text-align: right; width: 30%;">11°</td>
+        </tr>
+        <tr style="height: 35px;">
+            <td style="font-weight: 700; width: 35%;">TOR</td>
+            <td style="font-size: 24px; width: 35%; text-align: center; line-height: 1;">☀️</td>
+            <td style="text-align: right; width: 30%;">13°</td>
+        </tr>
+        <tr style="height: 35px;">
+            <td style="font-weight: 700; width: 35%;">FRE</td>
+            <td style="font-size: 24px; width: 35%; text-align: center; line-height: 1;">🌧️</td>
+            <td style="text-align: right; width: 30%;">19°</td>
+        </tr>
+        <tr style="height: 35px;">
+            <td style="font-weight: 700; width: 35%;">LØR</td>
+            <td style="font-size: 24px; width: 35%; text-align: center; line-height: 1;">☁️</td>
+            <td style="text-align: right; width: 30%;">13°</td>
+        </tr>
+        <tr style="height: 35px;">
+            <td style="font-weight: 700; width: 35%;">SØN</td>
+            <td style="font-size: 24px; width: 35%; text-align: center; line-height: 1;">🌧️</td>
+            <td style="text-align: right; width: 30%;">14°</td>
+        </tr></table>
         </div>
         
         <div class="column right-column">
@@ -81,35 +96,6 @@
             <div class="detail-text" id="flight-radar" style="font-weight: bold; margin-top: 15px;">Sjekker radar...</div>
         </div>
     </div>
-    
-    <div class="divider" style="margin: 15px auto;"></div>
-
-    <div class="forecast-container">
-        <div class="forecast-day">
-            <div class="forecast-dayname">ONS</div>
-            <div class="forecast-icon">☁️</div>
-            <div class="forecast-temp">11°</div>
-        </div>
-        <div class="forecast-day">
-            <div class="forecast-dayname">TOR</div>
-            <div class="forecast-icon">☀️</div>
-            <div class="forecast-temp">13°</div>
-        </div>
-        <div class="forecast-day">
-            <div class="forecast-dayname">FRE</div>
-            <div class="forecast-icon">🌧️</div>
-            <div class="forecast-temp">19°</div>
-        </div>
-        <div class="forecast-day">
-            <div class="forecast-dayname">LØR</div>
-            <div class="forecast-icon">☁️</div>
-            <div class="forecast-temp">13°</div>
-        </div>
-        <div class="forecast-day">
-            <div class="forecast-dayname">SØN</div>
-            <div class="forecast-icon">🌧️</div>
-            <div class="forecast-temp">14°</div>
-        </div></div>
 
     <div id="debug-log">System OK</div>
 
@@ -131,7 +117,7 @@
 
         var tosLat = 69.683;
         var tosLon = 18.919;
-        var avinorFlights = [{"id": "SK4416", "time": "13:20", "origin": "OSL"}, {"id": "WF904", "time": "13:25", "origin": "TOS"}, {"id": "WF983", "time": "13:55", "origin": "LKL"}, {"id": "LH878", "time": "14:30", "origin": "FRA"}, {"id": "DY376", "time": "16:00", "origin": "OSL"}];
+        var avinorFlights = [{"id": "LH878", "time": "14:30", "origin": "FRA"}, {"id": "DY376", "time": "16:00", "origin": "OSL"}, {"id": "WF866", "time": "16:00", "origin": "BOO"}, {"id": "WF1332", "time": "16:15", "origin": "BOO"}, {"id": "WF908", "time": "16:15", "origin": "TOS"}];
         var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=72.000,65.000,10.000,30.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
 
         function kalkulerAvstand(lat1, lon1, lat2, lon2) {
@@ -142,7 +128,7 @@
 
         function sjekkRadarOgOppdater() {
             if (!avinorFlights || avinorFlights.length === 0) {
-                document.getElementById("flight-id").innerText = "Ingen ruter tilgjengelig";
+                document.getElementById("flight-id").innerText = "Ingen kommende ruter";
                 return;
             }
 
@@ -199,7 +185,7 @@
                             document.getElementById("flight-origin").innerText = "FRA: " + standardFly.origin;
                             document.getElementById("flight-status-sub").innerText = "TOS / ENTC";
                             document.getElementById("flight-radar").innerText = "Ikke i radarområdet ennå";
-                            logg("Ingen aktive fly på radarkartet.");
+                            logg("Neste fly er ikke på kartet.");
                         }
 
                     } catch (e) {
