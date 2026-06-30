@@ -54,7 +54,6 @@ def get_weather():
         weather_text = symbol_code.replace("_day", "").replace("_night", "").replace("_", " ").upper()
         
         forecast_list = []
-        # FIKSET: Lagt til det manglende hermetegnet rundt "FRE" her under
         dag_navn_mapping = {0: "MAN", 1: "TIR", 2: "ONS", 3: "TOR", 4: "FRE", 5: "LØR", 6: "SØN"}
         
         idag_dato = datetime.now(TIMEZONE).date()
@@ -156,15 +155,16 @@ def generate_html():
     import json
     flights_json = json.dumps(flights_list)
     
-    forecast_html = '<table style="width: 100%; margin-top: 30px; font-size: 18px; border-collapse: collapse;">'
+    # NYTT: Bygger 5-dagersvarselet som 5 vannrette kolonner i stedet for en vertikal tabell
+    forecast_html = '<div class="forecast-container">'
     for f in weather["forecast"]:
         forecast_html += f"""
-        <tr style="height: 35px;">
-            <td style="font-weight: 700; width: 35%;">{f['dag']}</td>
-            <td style="font-size: 24px; width: 35%; text-align: center; line-height: 1;">{f['icon']}</td>
-            <td style="text-align: right; width: 30%;">{f['temp']}</td>
-        </tr>"""
-    forecast_html += '</table>'
+        <div class="forecast-day">
+            <div class="forecast-dayname">{f['dag']}</div>
+            <div class="forecast-icon">{f['icon']}</div>
+            <div class="forecast-temp">{f['temp']}</div>
+        </div>"""
+    forecast_html += '</div>'
     
     html_content = """<!DOCTYPE html>
 <html lang="no">
@@ -184,7 +184,7 @@ def generate_html():
             background-color: #ffffff;
             color: #000000;
             margin: 0;
-            padding: 40px 20px;
+            padding: 30px 20px 10px 20px;
             width: 600px;
             height: 800px;
             box-sizing: border-box;
@@ -192,21 +192,32 @@ def generate_html():
             flex-direction: column;
             justify-content: space-between;
         }
-        .top-section { text-align: center; margin-top: 20px; }
+        .top-section { text-align: center; margin-top: 10px; }
         .clock { font-size: 110px; font-weight: 700; letter-spacing: -2px; margin: 0; line-height: 1; }
         .date { font-size: 22px; font-weight: 400; color: #555555; margin-top: 15px; letter-spacing: 1px; }
-        .divider { border-top: 1px solid #e0e0e0; width: 85%; margin: 40px auto; }
-        .bottom-section { display: flex; flex: 1; padding: 0 20px; }
+        
+        .divider { border-top: 1px solid #e0e0e0; width: 90%; margin: 25px auto; }
+        
+        .middle-section { display: flex; height: 380px; padding: 0 10px; }
         .column { flex: 1; display: flex; flex-direction: column; }
         .left-column { padding-right: 20px; border-right: 1px solid #e0e0e0; }
-        .right-column { padding-left: 30px; }
+        .right-column { padding-left: 20px; }
+        
         .label-top { font-size: 16px; font-weight: 700; letter-spacing: 2px; margin: 0 0 5px 0; }
         .label-sub { font-size: 14px; font-weight: 400; color: #777777; margin: 0 0 10px 0; letter-spacing: 1px; }
-        .weather-icon { font-size: 65px; margin: 10px 0; line-height: 1; }
-        .huge-data { font-size: 75px; font-weight: 700; margin: 0 0 25px 0; line-height: 1; }
+        .weather-icon { font-size: 65px; margin: 5px 0; line-height: 1; }
+        .huge-data { font-size: 75px; font-weight: 700; margin: 0 0 15px 0; line-height: 1; }
         .detail-text { font-size: 18px; font-weight: 400; margin: 8px 0; color: #222222; }
         .radar-live-badge { display: inline-block; background-color: #000000; color: #ffffff; font-size: 12px; padding: 2px 6px; font-weight: bold; margin-left: 10px; vertical-align: middle; }
-        #debug-log { font-size: 10px; color: #aaaaaa; text-align: center; margin-top: 10px; font-family: monospace; }
+        
+        /* NYTT: Stil for det horisontale 5-dagersvarselet i bunnen */
+        .forecast-container { display: flex; justify-content: space-between; width: 90%; margin: 10px auto; padding-bottom: 10px; }
+        .forecast-day { flex: 1; text-align: center; }
+        .forecast-dayname { font-size: 14px; font-weight: 700; color: #000000; margin-bottom: 5px; }
+        .forecast-icon { font-size: 28px; line-height: 1; margin-bottom: 5px; }
+        .forecast-temp { font-size: 16px; font-weight: 400; }
+        
+        #debug-log { font-size: 10px; color: #aaaaaa; text-align: center; margin-top: 5px; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -218,7 +229,7 @@ def generate_html():
     
     <div class="divider"></div>
     
-    <div class="bottom-section">
+    <div class="middle-section">
         <div class="column left-column">
             <h2 class="label-top">TROMSØ</h2>
             <h3 class="label-sub">__WEATHER_SUMMARY__</h3>
@@ -226,7 +237,6 @@ def generate_html():
             <div class="huge-data">__WEATHER_TEMP__</div>
             <div class="detail-text">VIND: __WEATHER_WIND__</div>
             <div class="detail-text">FUKT: __WEATHER_HUMIDITY__</div>
-            __WEATHER_FORECAST__
         </div>
         
         <div class="column right-column">
@@ -239,6 +249,10 @@ def generate_html():
             <div class="detail-text" id="flight-radar" style="font-weight: bold; margin-top: 15px;">Sjekker radar...</div>
         </div>
     </div>
+    
+    <div class="divider" style="margin: 15px auto;"></div>
+
+    __WEATHER_FORECAST__
 
     <div id="debug-log">System OK</div>
 
@@ -362,7 +376,7 @@ def generate_html():
 
     with open("time.html", "w", encoding="utf-8") as f:
         f.write(html_content)
-    print("time.html lagret og feilrettet suksessfullt!")
+    print("time.html generert på nytt med optimalisert design!")
 
 if __name__ == "__main__":
     generate_html()
