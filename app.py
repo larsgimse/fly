@@ -1,10 +1,9 @@
 import os
 import requests
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-# Siden du har Pillow installert i workflowen din, bruker vi det til å sikre bildet
 try:
     from PIL import Image, ImageDraw
 except ImportError:
@@ -13,8 +12,6 @@ except ImportError:
 LAT, LON = 69.6492, 18.9553  # Tromsø
 USER_AGENT = "NookDashboard/1.0 (+https://github.com/dinbruker)"
 TIMEZONE = ZoneInfo("Europe/Oslo")
-
-# Vi bruker den offisielle Avinor-feeden som du har i den andre workflowen din
 AVINOR_URL = "https://asrv.avinor.no/XmlFeed/v1.0?airport=TOS"
 
 def get_weather():
@@ -38,7 +35,6 @@ def get_weather():
         return {"temp": "--°", "wind": "- m/s", "humidity": "-%", "summary": "UKJENT VÆR"}
 
 def get_next_flight():
-    """Henter flydata direkte fra den offisielle Avinor-feeden og finner neste ankomst"""
     try:
         response = requests.get(AVINOR_URL, timeout=10)
         response.raise_for_status()
@@ -57,22 +53,24 @@ def get_next_flight():
                 if flight_id_node is not None and airport_node is not None and sched_time_node is not None:
                     flights.append({
                         "time_raw": sched_time_node.text,
-                        "id": flight_id_node.text,
-                        "origin": airport_node.text.upper()
+                        "id": flight_id_node.text.strip(),
+                        "origin": airport_node.text.upper().strip()
                     })
         
         if not flights:
             return {"time": "--:--", "id": "Ingen fly funnet", "origin": "FRA: -", "raw_id": ""}
             
-        # Sorter etter tid (tidligste først)
         flights.sort(key=lambda x: x["time_raw"])
         
-        # Filtrer ut fly som allerede har landet basert på nåtid i UTC
+        # UTVIDET BUFFER: Vi tillater fly som skulle landet for inntil 2 timer siden,
+        # i tilfelle de er forsinket og er på radaren akkurat nå!
         nå_utc = datetime.now(ZoneInfo("UTC"))
+        grense_fortid = nå_utc - timedelta(hours=2)
+        
         kommende_fly = []
         for f in flights:
             fly_tid = datetime.fromisoformat(f["time_raw"].replace('Z', '+00:00'))
-            if fly_tid > nå_utc:
+            if fly_tid > grense_fortid:
                 kommende_fly.append(f)
                 
         neste = kommende_fly[0] if kommende_fly else flights[0]
@@ -117,102 +115,20 @@ def generate_html():
             flex-direction: column;
             justify-content: space-between;
         }
-        
-        .top-section {
-            text-align: center;
-            margin-top: 20px;
-        }
-        
-        .clock {
-            font-size: 110px;
-            font-weight: 700;
-            letter-spacing: -2px;
-            margin: 0;
-            line-height: 1;
-        }
-        
-        .date {
-            font-size: 22px;
-            font-weight: 400;
-            color: #555555;
-            margin-top: 15px;
-            letter-spacing: 1px;
-        }
-        
-        .divider {
-            border-top: 1px solid #e0e0e0;
-            width: 85%;
-            margin: 40px auto;
-        }
-        
-        .bottom-section {
-            display: flex;
-            flex: 1;
-            padding: 0 20px;
-        }
-        
-        .column {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .left-column {
-            padding-right: 20px;
-            border-right: 1px solid #e0e0e0;
-        }
-        
-        .right-column {
-            padding-left: 30px;
-        }
-        
-        .label-top {
-            font-size: 16px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            margin: 0 0 5px 0;
-        }
-        
-        .label-sub {
-            font-size: 14px;
-            font-weight: 400;
-            color: #777777;
-            margin: 0 0 35px 0;
-            letter-spacing: 1px;
-        }
-        
-        .huge-data {
-            font-size: 75px;
-            font-weight: 700;
-            margin: 0 0 25px 0;
-            line-height: 1;
-        }
-        
-        .detail-text {
-            font-size: 18px;
-            font-weight: 400;
-            margin: 8px 0;
-            color: #222222;
-        }
-
-        .radar-live-badge {
-            display: inline-block;
-            background-color: #000000;
-            color: #ffffff;
-            font-size: 12px;
-            padding: 2px 6px;
-            font-weight: bold;
-            margin-left: 10px;
-            vertical-align: middle;
-        }
-        
-        #debug-log {
-            font-size: 10px;
-            color: #aaaaaa;
-            text-align: center;
-            margin-top: 10px;
-            font-family: monospace;
-        }
+        .top-section { text-align: center; margin-top: 20px; }
+        .clock { font-size: 110px; font-weight: 700; letter-spacing: -2px; margin: 0; line-height: 1; }
+        .date { font-size: 22px; font-weight: 400; color: #555555; margin-top: 15px; letter-spacing: 1px; }
+        .divider { border-top: 1px solid #e0e0e0; width: 85%; margin: 40px auto; }
+        .bottom-section { display: flex; flex: 1; padding: 0 20px; }
+        .column { flex: 1; display: flex; flex-direction: column; }
+        .left-column { padding-right: 20px; border-right: 1px solid #e0e0e0; }
+        .right-column { padding-left: 30px; }
+        .label-top { font-size: 16px; font-weight: 700; letter-spacing: 2px; margin: 0 0 5px 0; }
+        .label-sub { font-size: 14px; font-weight: 400; color: #777777; margin: 0 0 35px 0; letter-spacing: 1px; }
+        .huge-data { font-size: 75px; font-weight: 700; margin: 0 0 25px 0; line-height: 1; }
+        .detail-text { font-size: 18px; font-weight: 400; margin: 8px 0; color: #222222; }
+        .radar-live-badge { display: inline-block; background-color: #000000; color: #ffffff; font-size: 12px; padding: 2px 6px; font-weight: bold; margin-left: 10px; vertical-align: middle; }
+        #debug-log { font-size: 10px; color: #aaaaaa; text-align: center; margin-top: 10px; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -252,10 +168,8 @@ def generate_html():
 
         function updateClock() {
             var now = new Date();
-            var timer = now.getHours().toString();
-            var minutter = now.getMinutes().toString();
-            if (timer.length < 2) timer = "0" + timer;
-            if (minutter.length < 2) minutter = "0" + minutter;
+            var timer = now.getHours().toString().padStart(2, '0');
+            var minutter = now.getMinutes().toString().padStart(2, '0');
             document.getElementById('live-clock').innerText = timer + ":" + minutter;
         }
         setInterval(updateClock, 1000);
@@ -263,8 +177,10 @@ def generate_html():
 
         var tosLat = 69.683;
         var tosLon = 18.919;
-        var flynr = "__RAW_FLIGHT_ID__";
-        var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=78.000,52.000,0.000,32.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
+        var flynr = "__RAW_FLIGHT_ID__".replace(/\s+/g, '').toUpperCase();
+        
+        // Henter et litt større område rundt Nord-Norge for å fange opp fly tidlig
+        var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=72.000,65.000,10.000,30.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
 
         function kalkulerAvstand(lat1, lon1, lat2, lon2) {
             var x = (lon2 - lon1) * Math.cos((lat1 + lat2) / 2 * 3.14159265 / 180) * 111.32;
@@ -278,49 +194,51 @@ def generate_html():
                 return;
             }
             
-            logg("Sjekker Flightradar for " + flynr + "...");
+            logg("Sjekker radar for " + flynr + "...");
             var xhrRadar = new XMLHttpRequest();
             xhrRadar.open("GET", radarUrl + "%26_" + new Date().getTime(), true);
             xhrRadar.onreadystatechange = function () {
-                if (xhrRadar.readyState === 4) {
-                    if (xhrRadar.status === 200) {
-                        try {
-                            var radarData = JSON.parse(xhrRadar.responseText);
-                            var match = null;
-                            var idSøk = flynr.replace(/\s+/g, '').toUpperCase();
-                            
-                            for (var nøkkel in radarData) {
-                                if (nøkkel !== "full_count" && nøkkel !== "version" && nøkkel !== "stats") {
-                                    var f = radarData[nøkkel];
-                                    var rutenummer = (f[13] || "").replace(/\s+/g, '').toUpperCase();
-                                    var callsign = (f[16] || "").replace(/\s+/g, '').toUpperCase();
+                if (xhrRadar.readyState === 4 && xhrRadar.status === 200) {
+                    try {
+                        var radarData = JSON.parse(xhrRadar.responseText);
+                        var match = null;
+                        
+                        // Lager alternative skrivemåter for sjekk (eks: SK4410 -> SAS4410, WF123 -> WIF123)
+                        var altSøk1 = flynr.replace("SK", "SAS").replace("WF", "WIF").replace("DY", "NAX").replace("D8", "IBK");
+                        var altSøk2 = flynr.replace("SAS", "SK").replace("WIF", "WF").replace("NAX", "DY").replace("IBK", "D8");
+
+                        for (var nøkkel in radarData) {
+                            if (nøkkel !== "full_count" && nøkkel !== "version" && nøkkel !== "stats") {
+                                var f = radarData[nøkkel];
+                                var rutenummer = (f[13] || "").replace(/\s+/g, '').toUpperCase();
+                                var callsign = (f[16] || "").replace(/\s+/g, '').toUpperCase();
+                                
+                                // Aggressiv matching mot alle kjente ID-er fra flyet
+                                if (rutenummer === flynr || callsign === flynr || 
+                                    rutenummer === altSøk1 || callsign === altSøk1 ||
+                                    rutenummer === altSøk2 || callsign === altSøk2) {
                                     
-                                    if (rutenummer === idSøk || callsign === idSøk.replace("SK", "SAS").replace("WF", "WIF").replace("DY", "NAX")) {
-                                        match = {
-                                            høyde: f[4] === 0 ? "Bakken" : f[4] + " ft",
-                                            fart: f[5] + " kt",
-                                            avstand: kalkulerAvstand(tosLat, tosLon, f[1], f[2])
-                                        };
-                                        break;
-                                    }
+                                    match = {
+                                        høyde: f[4] === 0 ? "Bakken" : f[4] + " ft",
+                                        fart: f[5] + " kt",
+                                        avstand: kalkulerAvstand(tosLat, tosLon, f[1], f[2])
+                                    };
+                                    break;
                                 }
                             }
-                            
-                            if (match) {
-                                document.getElementById("flight-status-sub").innerHTML = "TOS / ENTC <span class='radar-live-badge'>RADAR LIVE</span>";
-                                document.getElementById("flight-radar").innerHTML = match.avstand.toFixed(0) + " km unna<br>" + match.høyde + " / " + match.fart;
-                                logg("Radar funnet!");
-                            } else {
-                                document.getElementById("flight-radar").innerText = "Ikke i radarområdet ennå";
-                                logg("Ikke på radarkart ennå");
-                            }
-                        } catch (e) {
-                            document.getElementById("flight-radar").innerText = "Radarfeil";
-                            logg("Feil i radar-parsing");
                         }
-                    } else {
-                        document.getElementById("flight-radar").innerText = "Radar utilgjengelig";
-                        logg("Proxy utilgjengelig (" + xhrRadar.status + ")");
+                        
+                        if (match) {
+                            document.getElementById("flight-status-sub").innerHTML = "TOS / ENTC <span class='radar-live-badge'>RADAR LIVE</span>";
+                            document.getElementById("flight-radar").innerHTML = match.avstand.toFixed(0) + " km unna<br>" + match.høyde + " / " + match.fart;
+                            logg("Radar funnet for " + flynr);
+                        } else {
+                            document.getElementById("flight-status-sub").innerText = "TOS / ENTC";
+                            document.getElementById("flight-radar").innerText = "Ikke i radarområdet ennå";
+                            logg("Fant ikke flyet i lufta akkurat nå.");
+                        }
+                    } catch (e) {
+                        document.getElementById("flight-radar").innerText = "Radarfeil";
                     }
                 }
             };
@@ -328,7 +246,7 @@ def generate_html():
         }
 
         sjekkRadar();
-        setInterval(sjekkRadar, 30000);
+        setInterval(sjekkRadar, 30000); // Sjekker automatisk live på skjermen hvert 30. sekund
     </script>
 </body>
 </html>
@@ -345,21 +263,17 @@ def generate_html():
     html_content = html_content.replace("__FLIGHT_ORIGIN__", flight["origin"])
     html_content = html_content.replace("__RAW_FLIGHT_ID__", flight["raw_id"])
 
-    # Lagre den ferdige HTML-filen
     with open("time.html", "w", encoding="utf-8") as f:
         f.write(html_content)
-    print("time.html ble generert suksessfullt!")
+    print("time.html oppdatert med smart radarmatching!")
 
-    # Hvis Pillow er installert, lager vi også en bildefil som fallback for e-blekk
     try:
         img = Image.new('RGB', (600, 800), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
-        # Tegner en enkel bekreftelse i bildefila
         d.text((20, 20), f"Oppdatert: {now_local.strftime('%H:%M')}", fill=(0,0,0))
         d.text((20, 50), f"Vaer: {weather['temp']} - {weather['summary']}", fill=(0,0,0))
         d.text((20, 80), f"Neste fly: {flight['time']} -> {flight['id']}", fill=(0,0,0))
         img.save("dashboard.png")
-        print("dashboard.png ble generert!")
     except NameError:
         pass
 
