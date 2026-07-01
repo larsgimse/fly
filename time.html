@@ -61,11 +61,11 @@
     <div class="mid-section">
         <div class="column left-column">
             <h2 class="label-top">TROMSØ</h2>
-            <h3 class="label-sub">CLOUDY</h3>
+            <h3 class="label-sub">PARTLYCLOUDY</h3>
             <div class="weather-icon">☁️</div>
-            <div class="huge-data">11°</div>
-            <div class="detail-text">VIND: 7 m/s</div>
-            <div class="detail-text">FUKT: 82%</div>
+            <div class="huge-data">12°</div>
+            <div class="detail-text">VIND: 8 m/s</div>
+            <div class="detail-text">FUKT: 72%</div>
         </div>
         
         <div class="column right-column">
@@ -96,18 +96,18 @@
         </td>
         <td style="text-align: center; width: 20%; padding: 5px 0;">
             <div style="font-weight: 700; font-size: 14px; color: #555555; margin-bottom: 2px;">LØR</div>
-            <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">🌧️</div>
-            <div style="font-size: 16px; font-weight: 700;">13°</div>
+            <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">☁️</div>
+            <div style="font-size: 16px; font-weight: 700;">14°</div>
         </td>
         <td style="text-align: center; width: 20%; padding: 5px 0;">
             <div style="font-weight: 700; font-size: 14px; color: #555555; margin-bottom: 2px;">SØN</div>
             <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">🌧️</div>
-            <div style="font-size: 16px; font-weight: 700;">16°</div>
+            <div style="font-size: 16px; font-weight: 700;">19°</div>
         </td>
         <td style="text-align: center; width: 20%; padding: 5px 0;">
             <div style="font-weight: 700; font-size: 14px; color: #555555; margin-bottom: 2px;">MAN</div>
-            <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">☁️</div>
-            <div style="font-size: 16px; font-weight: 700;">12°</div>
+            <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">🌧️</div>
+            <div style="font-size: 16px; font-weight: 700;">13°</div>
         </td></tr></table>
     </div>
 
@@ -131,7 +131,7 @@
 
         var tosLat = 69.683;
         var tosLon = 18.919;
-        var avinorFlights = [{"id": "WF991", "time": "09:40", "origin": "KKN"}, {"id": "WF1343", "time": "09:45", "origin": "TRF"}, {"id": "SK4406", "time": "09:50", "origin": "OSL"}, {"id": "WF844", "time": "09:50", "origin": "BOO"}, {"id": "WF862", "time": "09:50", "origin": "BOO"}];
+        var avinorFlights = [{"id": "WF995", "time": "13:05", "origin": "KKN"}, {"id": "SK4416", "time": "13:20", "origin": "OSL"}, {"id": "WF904", "time": "13:25", "origin": "TOS"}, {"id": "WF983", "time": "13:55", "origin": "LKL"}, {"id": "LH878", "time": "14:30", "origin": "FRA"}];
         var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=72.000,65.000,10.000,30.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
 
         function kalkulerAvstand(lat1, lon1, lat2, lon2) {
