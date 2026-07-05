@@ -53,7 +53,7 @@
 
     <div class="top-section">
         <h1 class="clock" id="live-clock">--:--</h1>
-        <div class="date">SUNDAY, JULY 05</div>
+        <div class="date">MONDAY, JULY 06</div>
     </div>
     
     <div class="divider"></div>
@@ -85,11 +85,6 @@
         <h2 class="label-top" style="font-size: 13px; text-align: center; margin-bottom: 10px; color: #555555;">5-DAGERSVARSEL</h2>
         <table style="width: 100%; border-collapse: collapse; margin-top: 10px;"><tr>
         <td style="text-align: center; width: 20%; padding: 5px 0;">
-            <div style="font-weight: 700; font-size: 14px; color: #555555; margin-bottom: 2px;">MAN</div>
-            <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">☁️</div>
-            <div style="font-size: 16px; font-weight: 700;">20°</div>
-        </td>
-        <td style="text-align: center; width: 20%; padding: 5px 0;">
             <div style="font-weight: 700; font-size: 14px; color: #555555; margin-bottom: 2px;">TIR</div>
             <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">☁️</div>
             <div style="font-size: 16px; font-weight: 700;">12°</div>
@@ -108,6 +103,11 @@
             <div style="font-weight: 700; font-size: 14px; color: #555555; margin-bottom: 2px;">FRE</div>
             <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">☁️</div>
             <div style="font-size: 16px; font-weight: 700;">17°</div>
+        </td>
+        <td style="text-align: center; width: 20%; padding: 5px 0;">
+            <div style="font-weight: 700; font-size: 14px; color: #555555; margin-bottom: 2px;">LØR</div>
+            <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">🌧️</div>
+            <div style="font-size: 16px; font-weight: 700;">14°</div>
         </td></tr></table>
     </div>
 
@@ -131,7 +131,7 @@
 
         var tosLat = 69.683;
         var tosLon = 18.919;
-        var avinorFlights = [{"id": "SK4438", "time": "23:45", "origin": "OSL"}, {"id": "DY388", "time": "23:55", "origin": "OSL"}];
+        var avinorFlights = [{"id": "SK4409", "time": "07:00", "origin": "ALF"}];
         var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=72.000,65.000,10.000,30.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
 
         function kalkulerAvstand(lat1, lon1, lat2, lon2) {
