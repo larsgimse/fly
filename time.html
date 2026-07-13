@@ -63,9 +63,9 @@
             <h2 class="label-top">TROMSØ</h2>
             <h3 class="label-sub">CLOUDY</h3>
             <div class="weather-icon">☁️</div>
-            <div class="huge-data">16°</div>
-            <div class="detail-text">VIND: 7 m/s</div>
-            <div class="detail-text">FUKT: 68%</div>
+            <div class="huge-data">15°</div>
+            <div class="detail-text">VIND: 8 m/s</div>
+            <div class="detail-text">FUKT: 74%</div>
         </div>
         
         <div class="column right-column">
@@ -87,7 +87,7 @@
         <td style="text-align: center; width: 20%; padding: 5px 0;">
             <div style="font-weight: 700; font-size: 14px; color: #555555; margin-bottom: 2px;">TIR</div>
             <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">🌧️</div>
-            <div style="font-size: 16px; font-weight: 700;">10°</div>
+            <div style="font-size: 16px; font-weight: 700;">11°</div>
         </td>
         <td style="text-align: center; width: 20%; padding: 5px 0;">
             <div style="font-weight: 700; font-size: 14px; color: #555555; margin-bottom: 2px;">ONS</div>
@@ -131,7 +131,7 @@
 
         var tosLat = 69.683;
         var tosLon = 18.919;
-        var avinorFlights = [{"id": "DY376", "time": "16:00", "origin": "OSL"}, {"id": "WF866", "time": "16:00", "origin": "BOO"}, {"id": "WF1332", "time": "16:15", "origin": "BOO"}, {"id": "WF908", "time": "16:15", "origin": "TOS"}, {"id": "WF915", "time": "16:20", "origin": "HFT"}];
+        var avinorFlights = [{"id": "WF816", "time": "19:00", "origin": "OSL"}, {"id": "WF987", "time": "19:10", "origin": "LKL"}, {"id": "DY382", "time": "19:20", "origin": "OSL"}, {"id": "WF917", "time": "19:20", "origin": "TOS"}, {"id": "WF1334", "time": "19:25", "origin": "BOO"}];
         var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=72.000,65.000,10.000,30.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
 
         function kalkulerAvstand(lat1, lon1, lat2, lon2) {
