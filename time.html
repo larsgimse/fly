@@ -63,9 +63,9 @@
             <h2 class="label-top">TROMSØ</h2>
             <h3 class="label-sub">PARTLYCLOUDY</h3>
             <div class="weather-icon">☁️</div>
-            <div class="huge-data">11°</div>
-            <div class="detail-text">VIND: 2 m/s</div>
-            <div class="detail-text">FUKT: 64%</div>
+            <div class="huge-data">8°</div>
+            <div class="detail-text">VIND: 1 m/s</div>
+            <div class="detail-text">FUKT: 79%</div>
         </div>
         
         <div class="column right-column">
@@ -97,7 +97,7 @@
         <td style="text-align: center; width: 20%; padding: 5px 0;">
             <div style="font-weight: 700; font-size: 14px; color: #555555; margin-bottom: 2px;">TOR</div>
             <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">☁️</div>
-            <div style="font-size: 16px; font-weight: 700;">13°</div>
+            <div style="font-size: 16px; font-weight: 700;">12°</div>
         </td>
         <td style="text-align: center; width: 20%; padding: 5px 0;">
             <div style="font-weight: 700; font-size: 14px; color: #555555; margin-bottom: 2px;">FRE</div>
@@ -106,7 +106,7 @@
         </td>
         <td style="text-align: center; width: 20%; padding: 5px 0;">
             <div style="font-weight: 700; font-size: 14px; color: #555555; margin-bottom: 2px;">LØR</div>
-            <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">🌧️</div>
+            <div style="font-size: 26px; line-height: 1; margin-bottom: 2px;">☁️</div>
             <div style="font-size: 16px; font-weight: 700;">17°</div>
         </td></tr></table>
     </div>
@@ -131,7 +131,7 @@
 
         var tosLat = 69.683;
         var tosLon = 18.919;
-        var avinorFlights = [{"id": "WF630", "time": "22:20", "origin": "BGO"}, {"id": "WF939", "time": "22:25", "origin": "VDS"}, {"id": "DY388", "time": "23:45", "origin": "OSL"}, {"id": "SK4438", "time": "23:45", "origin": "OSL"}];
+        var avinorFlights = [{"id": "DY388", "time": "23:45", "origin": "OSL"}, {"id": "SK4438", "time": "23:45", "origin": "OSL"}];
         var radarUrl = "https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=72.000,65.000,10.000,30.000%26faa=1%26flight_states=1%26satellite=1%26mlat=1%26flarm=1%26adsb=1%26gnd=1%26air=1%26vehicles=0%26estimated=1";
 
         function kalkulerAvstand(lat1, lon1, lat2, lon2) {
