@@ -11,6 +11,7 @@
             --panel-bg: rgba(26, 26, 26, 0.9);
             --text-color: #eeeeee;
             --flight-yellow: #ffd700;
+            --archive-red: #ff4444;
         }
         
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -68,6 +69,7 @@
         }
         
         .btn-save { background: #166534; border-color: #22c55e; }
+        .btn-archive { background: #991b1b; border-color: #ef4444; opacity: 0.5; }
 
         #map-container {
             flex: 1;
@@ -124,7 +126,7 @@
         .counter-box { 
             position: fixed; 
             bottom: 20px; 
-            right: 20px; /* Plassert nede til høyre for å unngå kollisjon med zoom */
+            right: 20px; 
             z-index: 10000; 
             display: flex;
             flex-direction: column;
@@ -186,6 +188,7 @@
     <header>
         <h1>Flyradar</h1>
         <div class="nav-buttons">
+            <button id="btn-archive" class="btn btn-archive">Vis gammelt spor</button>
             <button id="btn-save" class="btn btn-save">💾 Lagre til fly.json</button>
         </div>
     </header>
@@ -218,12 +221,11 @@
         const minRenderer = L.canvas({ tolerance: isTouchDevice ? 22 : 3 });
 
         const map = L.map('map', {
-            zoomControl: false, // Vi fjerner standardplassering...
+            zoomControl: false,
             maxZoom: 18,
             renderer: minRenderer
         }).setView([69.65, 18.95], 9);
 
-        // ...og legger den til manuelt nede til venstre
         L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -243,6 +245,8 @@
         const counterEl = document.getElementById('counter');
         
         let flights = {};
+        let archivedFlights = {};
+        let showArchive = false;
         let flightInterval = null;
 
         const flightCanvas = L.DomUtil.create('canvas', 'leaflet-zoom-animated overlay-canvas');
@@ -276,6 +280,17 @@
             } catch(e) {}
         }
 
+        async function loadArchive() {
+            try {
+                const res = await fetch('fly.json?t=' + Date.now());
+                archivedFlights = await res.json();
+                showArchive = !showArchive;
+                document.getElementById('btn-archive').style.opacity = showArchive ? "1" : "0.5";
+            } catch (e) {
+                alert("Kunne ikke finne fly.json i mappen");
+            }
+        }
+
         function drawFlights() {
             flightCtx.clearRect(0, 0, flightCanvas.width, flightCanvas.height);
             const tl = map.latLngToLayerPoint(map.getBounds().getNorthWest());
@@ -288,6 +303,23 @@
             const showOrigin = document.getElementById('originSwitch').checked;
             const showDest = document.getElementById('destSwitch').checked;
 
+            // 1. Tegn Arkiv / Gammelt spor (Rød) hvis aktivert
+            if (showArchive) {
+                flightCtx.strokeStyle = "rgba(255, 68, 68, 0.5)";
+                flightCtx.lineWidth = 1.5;
+                for (let id in archivedFlights) {
+                    const h = archivedFlights[id].history;
+                    if (!h || h.length < 2) continue;
+                    flightCtx.beginPath();
+                    h.forEach((pos, i) => {
+                        const p = map.latLngToLayerPoint(pos);
+                        i === 0 ? flightCtx.moveTo(p.x - tl.x, p.y - tl.y) : flightCtx.lineTo(p.x - tl.x, p.y - tl.y);
+                    });
+                    flightCtx.stroke();
+                }
+            }
+
+            // 2. Tegn Live (Gul)
             for (let id in flights) {
                 const f = flights[id];
                 const p = map.latLngToLayerPoint([f.lat, f.lon]);
@@ -326,9 +358,9 @@
                     const pStart = map.latLngToLayerPoint(f.history[0]);
                     flightCtx.moveTo(pStart.x - tl.x, pStart.y - tl.y);
                     for (let i = 1; i < f.history.length - 1; i++) {
-                        const p = map.latLngToLayerPoint(f.history[i]);
+                        const pt = map.latLngToLayerPoint(f.history[i]);
                         const next = map.latLngToLayerPoint(f.history[i+1]);
-                        flightCtx.quadraticCurveTo(p.x - tl.x, p.y - tl.y, (p.x + next.x)/2 - tl.x, (p.y + next.y)/2 - tl.y);
+                        flightCtx.quadraticCurveTo(pt.x - tl.x, pt.y - tl.y, (pt.x + next.x)/2 - tl.x, (pt.y + next.y)/2 - tl.y);
                     }
                     flightCtx.stroke();
                 }
@@ -348,6 +380,7 @@
         map.on('move zoom', handleFlightMove);
         map.on('moveend', fetchFlights);
 
+        document.getElementById('btn-archive').onclick = loadArchive;
         document.getElementById('btn-save').onclick = () => {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(flights));
             const dl = document.createElement('a');
