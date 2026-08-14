@@ -1,1 +1,125 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Flyradar - Live & Arkiv</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root { --bg-color: #111111; --panel-bg: rgba(26, 26, 26, 0.9); --flight-yellow: #ffd700; --archive-red: #ff4444; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: var(--bg-color); color: #eee; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
+        header {
+            position: absolute; top: 10px; left: 10px; right: 10px; z-index: 1000;
+            background: var(--panel-bg); padding: 10px; border-radius: 8px; border: 1px solid #333;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        
+        .btn { padding: 6px 12px; border-radius: 6px; cursor: pointer; border: 1px solid #444; font-size: 0.8rem; font-weight: 500; }
+        .btn-save { background: #166534; color: white; }
+        .btn-archive { background: #991b1b; color: white; }
+        
+        #map-container { flex: 1; position: relative; }
+        #map { width: 100%; height: 100%; }
+        .overlay-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Flyradar</h1>
+        <div style="display:flex; gap:6px;">
+            <button id="btn-archive" class="btn btn-archive">Vis gammelt spor (Rød)</button>
+            <button id="btn-save" class="btn btn-save">💾 Lagre til fly.json</button>
+        </div>
+    </header>
+
+    <div id="map-container"><div id="map"></div></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        const map = L.map('map', { renderer: L.canvas() }).setView([69.65, 18.95], 9);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
+
+        let liveFlights = {};
+        let archivedFlights = {};
+        let showArchive = false;
+
+        const canvas = L.DomUtil.create('canvas', 'overlay-canvas');
+        map.getPanes().overlayPane.appendChild(canvas);
+        const ctx = canvas.getContext('2d');
+
+        // Hent live-data
+        async function fetchLiveFlights() {
+            const b = map.getBounds();
+            const url = `https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=${b.getNorth()},${b.getSouth()},${b.getWest()},${b.getEast()}`;
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                for (let id in data) {
+                    if (id === "full_count" || id === "version" || id === "stats") continue;
+                    if (!liveFlights[id]) liveFlights[id] = { history: [] };
+                    liveFlights[id].lat = data[id][1]; liveFlights[id].lon = data[id][2];
+                    liveFlights[id].history.push([data[id][1], data[id][2]]);
+                }
+            } catch (e) {}
+        }
+
+        // Hent arkiv-data fra GitHub
+        async function loadArchive() {
+            try {
+                const res = await fetch('fly.json?t=' + Date.now()); // cache-busting
+                archivedFlights = await res.json();
+                showArchive = !showArchive;
+                document.getElementById('btn-archive').style.opacity = showArchive ? "1" : "0.5";
+            } catch (e) { alert("Kunne ikke finne fly.json i mappen"); }
+        }
+
+        function draw() {
+            const size = map.getSize();
+            canvas.width = size.x; canvas.height = size.y;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Tegn Arkiv (Rød)
+            if (showArchive) {
+                ctx.strokeStyle = "rgba(255, 68, 68, 0.5)";
+                ctx.lineWidth = 1.5;
+                for (let id in archivedFlights) {
+                    const h = archivedFlights[id].history;
+                    ctx.beginPath();
+                    h.forEach((pos, i) => {
+                        const p = map.latLngToContainerPoint(pos);
+                        i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+                    });
+                    ctx.stroke();
+                }
+            }
+
+            // Tegn Live (Gul)
+            ctx.strokeStyle = "rgba(255, 215, 0, 0.6)";
+            ctx.lineWidth = 2;
+            for (let id in liveFlights) {
+                const h = liveFlights[id].history;
+                ctx.beginPath();
+                h.forEach((pos, i) => {
+                    const p = map.latLngToContainerPoint(pos);
+                    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+                });
+                ctx.stroke();
+            }
+            requestAnimationFrame(draw);
+        }
+
+        document.getElementById('btn-archive').onclick = loadArchive;
+        document.getElementById('btn-save').onclick = () => {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(liveFlights));
+            const dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", "fly.json"); dl.click();
+        };
+
+        setInterval(fetchLiveFlights, 15000);
+        draw();
+    </script>
+</body>
+</html>
