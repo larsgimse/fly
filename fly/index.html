@@ -3,123 +3,392 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Flyradar - Live & Arkiv</title>
+    <title>Flyradar</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { --bg-color: #111111; --panel-bg: rgba(26, 26, 26, 0.9); --flight-yellow: #ffd700; --archive-red: #ff4444; }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: sans-serif; background: var(--bg-color); color: #eee; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-
-        header {
-            position: absolute; top: 10px; left: 10px; right: 10px; z-index: 1000;
-            background: var(--panel-bg); padding: 10px; border-radius: 8px; border: 1px solid #333;
-            display: flex; justify-content: space-between; align-items: center;
+        :root {
+            --bg-color: #111111;
+            --panel-bg: rgba(26, 26, 26, 0.9);
+            --text-color: #eeeeee;
+            --flight-yellow: #ffd700;
         }
         
-        .btn { padding: 6px 12px; border-radius: 6px; cursor: pointer; border: 1px solid #444; font-size: 0.8rem; font-weight: 500; }
-        .btn-save { background: #166534; color: white; }
-        .btn-archive { background: #991b1b; color: white; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         
-        #map-container { flex: 1; position: relative; }
-        #map { width: 100%; height: 100%; }
-        .overlay-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            height: 100dvh; 
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            background: var(--panel-bg);
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #222;
+            border-radius: 8px;
+            z-index: 1000;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            min-height: 52px;
+        }
+
+        h1 { 
+            font-size: 1.1rem; 
+            font-weight: 700; 
+            letter-spacing: -0.5px; 
+            color: #fff;
+        }
+        
+        .nav-buttons { display: flex; gap: 6px; align-items: center; }
+        
+        .btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            background: #2a2a2a;
+            color: #fff;
+            border: 1px solid #333;
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        
+        .btn-save { background: #166534; border-color: #22c55e; }
+
+        #map-container {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background: var(--bg-color);
+        }
+
+        .panels-container {
+            position: fixed;
+            top: 75px;
+            right: 10px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .ui-panel {
+            background: var(--panel-bg); 
+            padding: 12px 15px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+            border: 1px solid #333;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            font-family: inherit; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 8px;
+            min-width: 180px;
+            pointer-events: auto;
+        }
+        
+        .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.8rem; color: #ddd; }
+        
+        .switch { position: relative; display: inline-block; width: 34px; height: 18px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .3s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+        
+        input:checked + .slider { background-color: #f59e0b; }
+        input:checked + .slider:before { transform: translateX(16px); }
+
+        .alt-slider { width: 60px; cursor: pointer; accent-color: #f59e0b; }
+        
+        .counter-box { 
+            position: fixed; 
+            bottom: 20px; 
+            right: 20px; /* Plassert nede til høyre for å unngå kollisjon med zoom */
+            z-index: 10000; 
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .counter { 
+            background: var(--panel-bg); 
+            padding: 6px 14px; 
+            border-radius: 20px; 
+            border: 1px solid #333;
+            font-size: 0.8rem; 
+            color: #ffd700;
+        }
+
+        .overlay-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 450;
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: #1a1a1a !important;
+            color: #fff !important;
+            border: 1px solid #ffd700 !important;
+            border-radius: 6px;
+        }
+        .leaflet-popup-tip {
+            background: #1a1a1a !important;
+        }
+
+        @media (max-width: 600px) {
+            header {
+                top: auto;
+                bottom: 20px;
+                flex-direction: column;
+                gap: 8px;
+                align-items: center;
+                background: rgba(20, 20, 20, 0.95);
+                box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+            }
+            .panels-container {
+                top: 10px;
+                right: 10px;
+                max-width: 200px;
+            }
+            .counter-box {
+                bottom: 100px;
+                right: 10px;
+            }
+            .leaflet-bottom { bottom: 100px !important; }
+        }
     </style>
 </head>
 <body>
 
     <header>
         <h1>Flyradar</h1>
-        <div style="display:flex; gap:6px;">
-            <button id="btn-archive" class="btn btn-archive">Vis gammelt spor (Rød)</button>
+        <div class="nav-buttons">
             <button id="btn-save" class="btn btn-save">💾 Lagre til fly.json</button>
         </div>
     </header>
 
-    <div id="map-container"><div id="map"></div></div>
+    <div class="panels-container">
+        <!-- FLY PANEL -->
+        <div id="flight-panel" class="ui-panel">
+            <div class="row">Haler: <label class="switch"><input type="checkbox" id="trailSwitch" checked><span class="slider"></span></label></div>
+            <div class="row">Flynr: <label class="switch"><input type="checkbox" id="flightNumSwitch"><span class="slider"></span></label></div>
+            <div class="row">Kallesignal: <label class="switch"><input type="checkbox" id="callsignSwitch"><span class="slider"></span></label></div>
+            <div class="row">Registrering: <label class="switch"><input type="checkbox" id="regSwitch"><span class="slider"></span></label></div>
+            <div class="row">Høyde (Av/Fot/m): <input type="range" id="altSlider" class="alt-slider" min="0" max="2" value="0"></div>
+            <div class="row">Fra: <label class="switch"><input type="checkbox" id="originSwitch"><span class="slider"></span></label></div>
+            <div class="row">Til: <label class="switch"><input type="checkbox" id="destSwitch"><span class="slider"></span></label></div>
+        </div>
+    </div>
+
+    <div class="counter-box">
+        <div id="counter" class="counter">Fly synlige: 0</div>
+    </div>
+
+    <div id="map-container">
+        <div id="map"></div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        const map = L.map('map', { renderer: L.canvas() }).setView([69.65, 18.95], 9);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        const minRenderer = L.canvas({ tolerance: isTouchDevice ? 22 : 3 });
 
-        let liveFlights = {};
-        let archivedFlights = {};
-        let showArchive = false;
+        const map = L.map('map', {
+            zoomControl: false, // Vi fjerner standardplassering...
+            maxZoom: 18,
+            renderer: minRenderer
+        }).setView([69.65, 18.95], 9);
 
-        const canvas = L.DomUtil.create('canvas', 'overlay-canvas');
-        map.getPanes().overlayPane.appendChild(canvas);
-        const ctx = canvas.getContext('2d');
+        // ...og legger den til manuelt nede til venstre
+        L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-        // Hent live-data
-        async function fetchLiveFlights() {
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        function updateCanvasPosition(c, ctx) {
+            const b = map.getBounds(), size = map.getSize(), tl = map.latLngToLayerPoint(b.getNorthWest());
+            c.style.left = tl.x + 'px'; 
+            c.style.top = tl.y + 'px';
+            c.width = size.x; 
+            c.height = size.y;
+        }
+
+        const counterEl = document.getElementById('counter');
+        
+        let flights = {};
+        let flightInterval = null;
+
+        const flightCanvas = L.DomUtil.create('canvas', 'leaflet-zoom-animated overlay-canvas');
+        map.getPanes().overlayPane.appendChild(flightCanvas);
+        const flightCtx = flightCanvas.getContext('2d');
+
+        async function fetchFlights() {
             const b = map.getBounds();
-            const url = `https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=${b.getNorth()},${b.getSouth()},${b.getWest()},${b.getEast()}`;
+            const url = `https://corsproxy.io/?https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=${b.getNorth().toFixed(1)},${b.getSouth().toFixed(1)},${b.getWest().toFixed(1)},${b.getEast().toFixed(1)}%26faa=1%26air=1&_=${Date.now()}`;
             try {
                 const res = await fetch(url);
+                if (!res.ok) return;
                 const data = await res.json();
+                let count = 0;
                 for (let id in data) {
                     if (id === "full_count" || id === "version" || id === "stats") continue;
-                    if (!liveFlights[id]) liveFlights[id] = { history: [] };
-                    liveFlights[id].lat = data[id][1]; liveFlights[id].lon = data[id][2];
-                    liveFlights[id].history.push([data[id][1], data[id][2]]);
+                    if (!flights[id]) flights[id] = { history: [] };
+                    flights[id].lat = data[id][1];
+                    flights[id].lon = data[id][2];
+                    flights[id].flight = data[id][13];
+                    flights[id].callsign = data[id][16];
+                    flights[id].reg = data[id][9]; 
+                    flights[id].alt = data[id][4]; 
+                    flights[id].origin = data[id][11];
+                    flights[id].dest = data[id][12];
+                    flights[id].history.push([data[id][1], data[id][2]]);
+                    if (flights[id].history.length > 60) flights[id].history.shift();
+                    count++;
                 }
-            } catch (e) {}
+                counterEl.innerText = "Fly synlige: " + count;
+            } catch(e) {}
         }
 
-        // Hent arkiv-data fra GitHub
-        async function loadArchive() {
-            try {
-                const res = await fetch('fly.json?t=' + Date.now()); // cache-busting
-                archivedFlights = await res.json();
-                showArchive = !showArchive;
-                document.getElementById('btn-archive').style.opacity = showArchive ? "1" : "0.5";
-            } catch (e) { alert("Kunne ikke finne fly.json i mappen"); }
-        }
+        function drawFlights() {
+            flightCtx.clearRect(0, 0, flightCanvas.width, flightCanvas.height);
+            const tl = map.latLngToLayerPoint(map.getBounds().getNorthWest());
+            
+            const showTrails = document.getElementById('trailSwitch').checked;
+            const showFlight = document.getElementById('flightNumSwitch').checked;
+            const showCallsign = document.getElementById('callsignSwitch').checked;
+            const showReg = document.getElementById('regSwitch').checked;
+            const altMode = document.getElementById('altSlider').value;
+            const showOrigin = document.getElementById('originSwitch').checked;
+            const showDest = document.getElementById('destSwitch').checked;
 
-        function draw() {
-            const size = map.getSize();
-            canvas.width = size.x; canvas.height = size.y;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let id in flights) {
+                const f = flights[id];
+                const p = map.latLngToLayerPoint([f.lat, f.lon]);
+                
+                flightCtx.fillStyle = "#ffd700";
+                flightCtx.beginPath(); 
+                flightCtx.arc(p.x - tl.x, p.y - tl.y, 4, 0, Math.PI * 2); 
+                flightCtx.fill();
+                
+                flightCtx.strokeStyle = "rgba(255, 215, 0, 0.4)";
+                flightCtx.lineWidth = 2;
+                flightCtx.stroke();
 
-            // Tegn Arkiv (Rød)
-            if (showArchive) {
-                ctx.strokeStyle = "rgba(255, 68, 68, 0.5)";
-                ctx.lineWidth = 1.5;
-                for (let id in archivedFlights) {
-                    const h = archivedFlights[id].history;
-                    ctx.beginPath();
-                    h.forEach((pos, i) => {
-                        const p = map.latLngToContainerPoint(pos);
-                        i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
-                    });
-                    ctx.stroke();
+                let labels = [];
+                if (showFlight) labels.push(f.flight);
+                if (showCallsign) labels.push(f.callsign);
+                if (showReg) labels.push(f.reg || "N/A");
+                
+                if (altMode == 1) labels.push(f.alt + "ft");
+                else if (altMode == 2) labels.push(Math.round(f.alt * 0.3048) + "m");
+                
+                if (showOrigin && showDest) labels.push(`${f.origin || '??'} → ${f.dest || '??'}`);
+                else if (showOrigin) labels.push(`${f.origin || '??'} →`);
+                else if (showDest) labels.push(`→ ${f.dest || '??'}`);
+
+                if (labels.length > 0) {
+                    flightCtx.font = "11px -apple-system, sans-serif";
+                    flightCtx.fillStyle = "#ffea75";
+                    flightCtx.fillText(labels.join(" | "), p.x - tl.x + 9, p.y - tl.y + 4);
+                }
+
+                if (showTrails && f.history.length > 2) {
+                    flightCtx.beginPath();
+                    flightCtx.strokeStyle = "rgba(255, 215, 0, 0.5)";
+                    flightCtx.lineWidth = 1.5;
+                    const pStart = map.latLngToLayerPoint(f.history[0]);
+                    flightCtx.moveTo(pStart.x - tl.x, pStart.y - tl.y);
+                    for (let i = 1; i < f.history.length - 1; i++) {
+                        const p = map.latLngToLayerPoint(f.history[i]);
+                        const next = map.latLngToLayerPoint(f.history[i+1]);
+                        flightCtx.quadraticCurveTo(p.x - tl.x, p.y - tl.y, (p.x + next.x)/2 - tl.x, (p.y + next.y)/2 - tl.y);
+                    }
+                    flightCtx.stroke();
                 }
             }
-
-            // Tegn Live (Gul)
-            ctx.strokeStyle = "rgba(255, 215, 0, 0.6)";
-            ctx.lineWidth = 2;
-            for (let id in liveFlights) {
-                const h = liveFlights[id].history;
-                ctx.beginPath();
-                h.forEach((pos, i) => {
-                    const p = map.latLngToContainerPoint(pos);
-                    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
-                });
-                ctx.stroke();
-            }
-            requestAnimationFrame(draw);
+            requestAnimationFrame(drawFlights);
         }
 
-        document.getElementById('btn-archive').onclick = loadArchive;
+        function handleFlightMove() {
+            updateCanvasPosition(flightCanvas, flightCtx);
+        }
+
+        updateCanvasPosition(flightCanvas, flightCtx);
+        fetchFlights();
+        flightInterval = setInterval(fetchFlights, 15000);
+        drawFlights();
+
+        map.on('move zoom', handleFlightMove);
+        map.on('moveend', fetchFlights);
+
         document.getElementById('btn-save').onclick = () => {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(liveFlights));
-            const dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", "fly.json"); dl.click();
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(flights));
+            const dl = document.createElement('a');
+            dl.setAttribute("href", dataStr);
+            dl.setAttribute("download", "fly.json");
+            dl.click();
         };
 
-        setInterval(fetchLiveFlights, 15000);
-        draw();
+        map.on('click', function(e) {
+            const clickPoint = map.latLngToContainerPoint(e.latlng);
+            const tl = map.latLngToLayerPoint(map.getBounds().getNorthWest());
+
+            let clickedFlight = null;
+            let minDist = 20;
+
+            for (let id in flights) {
+                const f = flights[id];
+                const p = map.latLngToLayerPoint([f.lat, f.lon]);
+                const screenX = p.x - tl.x;
+                const screenY = p.y - tl.y;
+
+                const dist = Math.hypot(clickPoint.x - screenX, clickPoint.y - screenY);
+                if (dist < minDist) {
+                    minDist = dist;
+                    clickedFlight = f;
+                }
+            }
+
+            if (clickedFlight) {
+                const altMeters = Math.round(clickedFlight.alt * 0.3048);
+                L.popup({ offset: [0, -5], className: 'flight-popup' })
+                    .setLatLng([clickedFlight.lat, clickedFlight.lon])
+                    .setContent(`
+                        <b style="font-size:14px; color:#fff;">Fly: ${clickedFlight.flight || 'Ukjent'}</b><br>
+                        <span style="font-size:12px; color:#aaa;">Kallesignal: ${clickedFlight.callsign || 'N/A'} | Reg: ${clickedFlight.reg || 'N/A'}</span><br>
+                        Høyde: ${clickedFlight.alt} ft (${altMeters} m)<br>
+                        Rute: ${clickedFlight.origin || '??'} ➔ ${clickedFlight.dest || '??'}
+                    `)
+                    .openOn(map);
+            }
+        });
     </script>
 </body>
 </html>
